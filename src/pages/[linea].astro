@@ -1,9 +1,8 @@
 ---
 import fs from 'node:fs';
 import path from 'node:path';
-import '../../styles/global.css';
+import '../styles/global.css';
 
-// Generación de rutas dinámicas estáticas para Vercel
 export function getStaticPaths() {
   return [
     { params: { linea: 'pe-17' } },
@@ -15,20 +14,72 @@ export function getStaticPaths() {
 const { linea } = Astro.params;
 const codigoLineaUpper = linea.toUpperCase();
 
-// Lógica de lectura física de archivos
+// 1. Coordenadas relativas (X, Y de 0 a 100) para pintar el mapa ferroviario real
+const CONFIG_MAPAS: Record<string, Record<string, { x: number; y: number }>> = {
+  "PE-17": {
+    "El Priorato": { x: 85, y: 15 },
+    "Lora del Río": { x: 78, y: 22 },
+    "Guadañoz": { x: 70, y: 30 },
+    "Los Rosales": { x: 62, y: 38 },
+    "Brenes": { x: 54, y: 46 },
+    "Majarabique": { x: 45, y: 55 },
+    "Triángulo Tamarguillo": { x: 45, y: 68 },
+    "La Negrilla": { x: 52, y: 78 },
+    "C.T.T. Sevilla": { x: 38, y: 72 },
+    "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja": { x: 30, y: 60 },
+    "Sevilla Santa Justa": { x: 35, y: 85 }
+  },
+  "PE-24": {
+    "Sevilla Santa Justa": { x: 50, y: 8 },
+    "La Salud": { x: 50, y: 16 },
+    "Dos Hermanas": { x: 50, y: 24 },
+    "Utrera": { x: 50, y: 32 },
+    "Las Alcantarillas": { x: 54, y: 38 },
+    "Las Cabezas": { x: 46, y: 44 },
+    "Lebrija": { x: 42, y: 52 },
+    "Aeropuerto de Jerez": { x: 38, y: 60 },
+    "Jerez-Mercancías": { x: 38, y: 66 },
+    "Jerez de la Frontera": { x: 34, y: 72 },
+    "El Puerto de Santa María": { x: 34, y: 80 },
+    "Las Aletas": { x: 34, y: 86 },
+    "Puerto Real": { x: 34, y: 92 },
+    "San Fernando-Bahía Sur": { x: 26, y: 92 },
+    "Cortadura": { x: 18, y: 84 },
+    "Cádiz": { x: 18, y: 74 }
+  },
+  "PE-26": {
+    "Majarabique": { x: 90, y: 30 },
+    "Alamillo": { x: 82, y: 35 },
+    "Apd. S. Jerónimo-Apd. Estadio-Apd. Cartuja": { x: 82, y: 45 },
+    "Valencina-Santiponce": { x: 74, y: 30 },
+    "Salteras": { x: 67, y: 35 },
+    "Villanueva-Olivares": { x: 60, y: 38 },
+    "Benacazón": { x: 53, y: 42 },
+    "Aznalcázar-Pilas": { x: 46, y: 45 },
+    "Huévar": { x: 40, y: 48 },
+    "Carrión de los Céspedes": { x: 34, y: 50 },
+    "Escacena": { x: 28, y: 52 },
+    "Villalba": { x: 23, y: 54 },
+    "La Palma del Condado": { x: 18, y: 56 },
+    "Niebla": { x: 14, y: 60 },
+    "San Juan del Puerto": { x: 10, y: 65 },
+    "Huelva Mercancías": { x: 8, y: 72 },
+    "Huelva": { x: 8, y: 82 }
+  }
+};
+
 const docsDir = path.join(process.cwd(), 'public', 'docs', 'Consignas finales');
 let rawFiles: string[] = [];
 
 if (fs.existsSync(docsDir)) {
   const allFiles = fs.readdirSync(docsDir, { recursive: true }) as string[];
-  // Filtrar solo los archivos que pertenecen a la carpeta de esta línea concreta
   rawFiles = allFiles.filter(file => 
     file.replace(/\\/g, '/').toUpperCase().startsWith(codigoLineaUpper + '/') && file.endsWith('.pdf')
   );
 }
 
-// Agrupación y extracción del prefijo numérico
-const estacionesAgrupadas: Record<string, { esquemaUrl?: string; subestacionUrl?: string; orden: number }> = {};
+const estacionesAgrupadas: Record<string, { esquemaUrl?: string; subestacionUrl?: string; orden: number; x: number; y: number }> = {};
+const coordMapa = CONFIG_MAPAS[codigoLineaUpper] || {};
 
 rawFiles.forEach((filePath) => {
   const normalizedPath = filePath.replace(/\\/g, '/');
@@ -52,26 +103,34 @@ rawFiles.forEach((filePath) => {
     nombreEstacion = fileName.replace('.pdf', '').replace(/^\d+_/,'').trim();
   }
 
-  if (!estacionesAgrupadas[nombreEstacion]) {
-    estacionesAgrupadas[nombreEstacion] = { orden: numeroOrden };
+  // Corregir emparejamiento exacto con el mapa de coordenadas fijas
+  const nombreClave = Object.keys(coordMapa).find(k => k.toLowerCase() === nombreEstacion.toLowerCase()) || nombreEstacion;
+  const coords = coordMapa[nombreClave] || { x: 50, y: 50 };
+
+  if (!estacionesAgrupadas[nombreClave]) {
+    estacionesAgrupadas[nombreClave] = { 
+      orden: numeroOrden,
+      x: coords.x,
+      y: coords.y
+    };
   }
 
   const urlPublica = `/docs/Consignas finales/${normalizedPath}`;
   if (esSubestacion) {
-    estacionesAgrupadas[nombreEstacion].subestacionUrl = urlPublica;
+    estacionesAgrupadas[nombreClave].subestacionUrl = urlPublica;
   } else {
-    estacionesAgrupadas[nombreEstacion].esquemaUrl = urlPublica;
-  }
-  
-  if (numeroOrden < estacionesAgrupadas[nombreEstacion].orden) {
-    estacionesAgrupadas[nombreEstacion].orden = numeroOrden;
+    estacionesAgrupadas[nombreClave].esquemaUrl = urlPublica;
   }
 });
 
-// Ordenar de forma secuencial exacta
 const nombresEstacionesOrdenadas = Object.keys(estacionesAgrupadas).sort((a, b) => {
   return estacionesAgrupadas[a].orden - estacionesAgrupadas[b].orden;
 });
+
+// Generar el path del SVG (Polyline) uniendo los nodos en orden
+const svgPoints = nombresEstacionesOrdenadas
+  .map(name => `${estacionesAgrupadas[name].x * 15},${estacionesAgrupadas[name].y * 7}`)
+  .join(' ');
 ---
 
 <html lang="es">
@@ -81,72 +140,81 @@ const nombresEstacionesOrdenadas = Object.keys(estacionesAgrupadas).sort((a, b) 
     <meta name="viewport" content="width=device-width" />
     <title>Mapa Interactivo - {codigoLineaUpper}</title>
   </head>
-  <body class="bg-slate-950 text-slate-100 min-h-screen font-sans dynamic-scroll">
+  <body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
     
-    <main class="max-w-[1900px] mx-auto p-8 lg:p-12 w-full">
+    <main class="max-w-[1600px] mx-auto p-6 lg:p-10 w-full">
       
-      <!-- BOTÓN VOLVER -->
       <a href="/" class="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-6 transition-colors group">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4 group-hover:-translate-x-1 transition-transform">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4 group-hover:-translate-x-1 transition-transform"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
         Volver al selector de líneas
       </a>
 
-      <!-- CABECERA -->
-      <div class="flex items-center gap-4 mb-10 border-b border-slate-800 pb-6">
+      <div class="flex items-center gap-4 mb-8 border-b border-slate-800 pb-4">
         <span class="text-xs font-mono uppercase bg-emerald-950 text-emerald-300 border border-emerald-800 px-3 py-1 rounded">
           {codigoLineaUpper}
         </span>
-        <h1 class="text-3xl lg:text-4xl font-bold tracking-tight text-white">
-          Esquema de Electrificación Interactivo
-        </h1>
+        <h1 class="text-2xl font-bold tracking-tight text-white">Esquema Ferroviario Interactivo</h1>
       </div>
 
-      <!-- ================= MAPA 2D INTERACTIVO LINEAL ================= -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 mb-12 shadow-2xl overflow-x-auto">
-        <h2 class="text-sm font-semibold uppercase text-slate-400 tracking-wider mb-8">
-          Trazado Esquemático de la Línea (Nodos de Estación)
-        </h2>
-        
-        <div class="relative flex items-center justify-between min-w-[1200px] px-8 py-6">
-          <!-- Línea física del trazado ferroviario -->
-          <div class="absolute left-12 right-12 top-1/2 h-1 bg-gradient-to-r from-emerald-500 via-sky-500 to-amber-500 -translate-y-1/2 z-0 rounded-full opacity-60"></div>
+      <!-- MAPA SVG INTERACTIVO -->
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 mb-10 shadow-2xl relative overflow-hidden">
+        <div class="absolute top-4 left-6 z-20">
+          <h2 class="text-xs font-bold uppercase text-slate-400 tracking-widest">Diagrama de Vías Convencional</h2>
+          <p class="text-[11px] text-slate-500 mt-0.5">Haz clic sobre cualquier nodo para saltar a sus consignas o planos técnicos</p>
+        </div>
 
-          {nombresEstacionesOrdenadas.map((nombre, index) => {
-            const info = estacionesAgrupadas[nombre];
-            // Generamos un ID seguro para hacer scroll
-            const elementId = `estacion-${nombre.toLowerCase().replace(/\s+/g, '-')}`;
+        <div class="w-full overflow-auto flex justify-center py-6">
+          <svg class="w-[1500px] h-[750px] bg-slate-950/40 rounded-2xl border border-slate-800/80" viewBox="0 0 1500 750">
+            <!-- Trazado de cables/vías (Fondo) -->
+            <polyline points={svgPoints} fill="none" stroke="#334155" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+            <!-- Trazado de cables/vías (Iluminado) -->
+            <polyline points={svgPoints} fill="none" stroke="url(#railGradient)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="opacity-80" />
             
-            return (
-              <div class="relative z-10 flex flex-col items-center group">
-                <!-- Identificador visual del nodo (Círculo ferroviario) -->
-                <button
-                  onclick={`document.getElementById('${elementId}')?.scrollIntoView({ behavior: 'smooth', block: 'center' })`}
-                  class="w-7 h-7 rounded-full bg-slate-950 border-4 border-slate-700 group-hover:border-emerald-400 group-hover:scale-125 transition-all duration-200 shadow-xl flex items-center justify-center cursor-pointer"
-                  title={`Saltar a ${nombre}`}
-                >
-                  <div class="w-1.5 h-1.5 rounded-full bg-slate-800 group-hover:bg-emerald-400"></div>
-                </button>
+            <!-- Definición de Gradientes -->
+            <defs>
+              <linearGradient id="railGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#10b981" />
+                <stop offset="50%" stop-color="#06b6d4" />
+                <stop offset="100%" stop-color="#f59e0b" />
+              </linearGradient>
+            </defs>
 
-                <!-- Etiqueta del Nombre (Alternando arriba/abajo para que no colisionen) -->
-                <div class={`absolute ${index % 2 === 0 ? 'top-9' : '-top-12'} flex flex-col items-center w-36 text-center transition-all duration-200 group-hover:scale-105`}>
-                  <span class="text-[11px] font-bold text-slate-300 group-hover:text-white leading-tight block truncate w-full">
+            <!-- Renderizado de los Nodos Interactivos -->
+            {nombresEstacionesOrdenadas.map((nombre) => {
+              const info = estacionesAgrupadas[nombre];
+              const posX = info.x * 15;
+              const posY = info.y * 7;
+              const elementId = `estacion-${nombre.toLowerCase().replace(/\s+/g, '-')}`;
+
+              return (
+                <g 
+                  class="cursor-pointer group select-none"
+                  onclick={`document.getElementById('${elementId}')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); document.getElementById('${elementId}').classList.add('ring-2', 'ring-emerald-500'); setTimeout(() => document.getElementById('${elementId}').classList.remove('ring-2', 'ring-emerald-500'), 2000);`}
+                >
+                  {/* Halo reflectante al pasar el ratón */}
+                  <circle cx={posX} cy={posY} r="14" fill="#10b981" class="opacity-0 group-hover:opacity-20 transition-all duration-200" />
+                  {/* Anillo exterior del nodo */}
+                  <circle cx={posX} cy={posY} r="8" fill="#020617" stroke={info.subestacionUrl ? "#f59e0b" : "#06b6d4"} stroke-width="3" class="group-hover:stroke-white transition-all duration-200" />
+                  {/* Centro del nodo */}
+                  <circle cx={posX} cy={posY} r="3" fill={info.subestacionUrl ? "#f59e0b" : "#06b6d4"} />
+                  
+                  {/* Etiquetas de las estaciones */}
+                  <text 
+                    x={posX} 
+                    y={posY - 14} 
+                    text-anchor="middle" 
+                    class="fill-slate-400 font-sans font-bold text-[11px] group-hover:fill-white transition-colors duration-150"
+                  >
                     {nombre}
-                  </span>
-                  <span class="text-[9px] font-mono text-slate-500 uppercase mt-0.5">
-                    {info.subestacionUrl ? 'Estación + S/E' : 'Estación'}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
         </div>
       </div>
 
-      <!-- ================= REJILLA DE TARJETAS DETALLADAS ================= -->
-      <h2 class="text-xl font-bold text-white mb-6">Documentación Técnica Vinculada</h2>
-      
+      <!-- REJILLA DE TARJETAS (OBJETIVOS DEL SCROLL) -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {nombresEstacionesOrdenadas.map((nombre) => {
           const info = estacionesAgrupadas[nombre];
@@ -155,35 +223,33 @@ const nombresEstacionesOrdenadas = Object.keys(estacionesAgrupadas).sort((a, b) 
           return (
             <div 
               id={elementId}
-              class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-lg hover:border-slate-600 transition-all scroll-mt-24 target:border-emerald-500 target:ring-1 target:ring-emerald-500"
+              class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between transition-all duration-300 scroll-mt-28"
             >
-              <div class="mb-6">
-                <span class="text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded inline-block mb-2">
-                  Prog: {info.orden.toString().padStart(2, '0')}
+              <div class="mb-4">
+                <span class={`text-[9px] font-mono border px-2 py-0.5 rounded inline-block mb-2 ${info.subestacionUrl ? 'bg-amber-950 text-amber-400 border-amber-900' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                  {info.subestacionUrl ? 'Estación + S/E' : 'Estación Convencional'}
                 </span>
-                <h3 class="text-xl font-bold text-slate-100 leading-tight">
-                  {nombre}
-                </h3>
+                <h3 class="text-lg font-bold text-slate-100 leading-tight">{nombre}</h3>
               </div>
               
-              <div class="flex flex-col gap-2.5">
+              <div class="flex flex-col gap-2">
                 {info.esquemaUrl && (
-                  <a href={info.esquemaUrl} target="_blank" rel="noreferrer" class="w-full bg-slate-800 hover:bg-sky-900/40 text-sky-400 hover:text-sky-300 font-medium text-xs py-3 px-4 rounded-xl border border-slate-700 hover:border-sky-800 transition-all flex items-center justify-between group">
+                  <a href={info.esquemaUrl} target="_blank" rel="noreferrer" class="w-full bg-slate-800 hover:bg-sky-900/40 text-sky-400 font-medium text-xs py-2.5 px-3 rounded-xl border border-slate-700 hover:border-sky-800 transition-all flex items-center justify-between group">
                     <span class="flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8m-6-3.75h6m-9 6h12A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.625C4.409 3.75 3.375 4.784 3.375 6v12A2.25 2.25 0 0 0 5.625 20.25Z" /></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8m-6-3.75h6m-9 6h12A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.625C4.409 3.75 3.375 4.784 3.375 6v12A2.25 2.25 0 0 0 5.625 20.25Z" /></svg>
                       Esquema de Estación
                     </span>
-                    <span class="text-[10px] bg-sky-950 px-2 py-0.5 rounded border border-sky-900 text-sky-400 font-mono">PDF</span>
+                    <span class="text-[10px] font-mono opacity-60">PDF</span>
                   </a>
                 )}
 
                 {info.subestacionUrl && (
-                  <a href={info.subestacionUrl} target="_blank" rel="noreferrer" class="w-full bg-slate-800 hover:bg-amber-900/40 text-amber-400 hover:text-amber-300 font-medium text-xs py-3 px-4 rounded-xl border border-slate-700 hover:border-amber-800 transition-all flex items-center justify-between group">
+                  <a href={info.subestacionUrl} target="_blank" rel="noreferrer" class="w-full bg-slate-800 hover:bg-amber-900/40 text-amber-400 font-medium text-xs py-2.5 px-3 rounded-xl border border-slate-700 hover:border-amber-800 transition-all flex items-center justify-between group">
                     <span class="flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
                       Subestación (S/E)
                     </span>
-                    <span class="text-[10px] bg-amber-950 px-2 py-0.5 rounded border border-amber-900 text-amber-400 font-mono">PDF</span>
+                    <span class="text-[10px] font-mono opacity-60">PDF</span>
                   </a>
                 )}
               </div>
