@@ -1,50 +1,146 @@
 ---
-import fs from 'node:fs';
-import path from 'node:path';
-import '../../styles/global.css';
+import fs from "node:fs";
+import path from "node:path";
+import "../../styles/global.css";
 
-// Generación estática combinada de Línea + Estación para el build de Vercel
+// Función auxiliar para limpiar de raíz tildes, eñes y caracteres especiales
+const limpiarString = (str: string) => {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Elimina tildes
+    .replace(/[^a-z0-9]/g, " ") // Cambia símbolos por espacios
+    .replace(/\s+/g, " ") // Colapsa múltiples espacios
+    .trim();
+};
 export function getStaticPaths() {
-  // Mapeo exacto de los nombres que generan los archivos físicos
-  const estacionesPorLinea: Record<string, string[]> = {
-    "pe-17": ["el-priorato", "lora-del-río", "guadañoz", "los-rosales", "brenes", "majarabique", "triángulo-tamarguillo", "la-negrilla", "c.t.t.-sevilla", "apd.-s.-jerónimo---apd.-estadio---apd.-cartuja", "sevilla-santa-justa"],
-    "pe-24": ["sevilla-santa-justa", "la-salud", "dos-hermanas", "utrera", "las-alcantarillas", "las-cabezas", "lebrija", "aeropuerto-de-jerez", "jerez-mercancías", "jerez-de-la-frontera", "el-puerto-de-santa-maría", "las-aletas", "puerto-real", "san-fernando-bahía-sur", "cortadura", "cádiz"],
-    "pe-26": ["majarabique", "alamillo", "apd.-s.-jerónimo-apd.-estadio-apd.-cartuja", "valencina-santiponce", "salteras", "villanueva-olivares", "benacazón", "aznalcázar-pilas", "huévar", "carrión-de-los-céspedes", "escacena", "villalba", "la-palma-del-condado", "niebla", "san-juan-del-puerto", "huelva-mercancías", "huelva"]
+  // Lista oficial de nombres tal cual los lee el mapa[cite: 1, 2, 3]
+  const MAPAS_ESTACIONES: Record<string, string[]> = {
+    "pe-17": [
+      "El Priorato", "Lora del Río", "Guadañoz", "Los Rosales", "Brenes", "Majarabique", 
+      "Triángulo Tamarguillo", "La Negrilla", "C.T.T. Sevilla", 
+      "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja", "Sevilla Santa Justa"
+    ],
+    "pe-24": [
+      "Sevilla Santa Justa", "La Salud", "Dos Hermanas", "Utrera", "Las Alcantarillas", 
+      "Las Cabezas", "Lebrija", "Aeropuerto de Jerez", "Jerez-Mercancías", "Jerez de la Frontera", 
+      "El Puerto de Santa María", "Las Aletas", "Puerto Real", "San Fernando-Bahía Sur", 
+      "Cortadura", "Cádiz"
+    ],
+    "pe-26": [
+      "Majarabique", "Alamillo", "Apd. S. Jerónimo-Apd. Estadio-Apd. Cartuja", 
+      "Valencina-Santiponce", "Salteras", "Villanueva-Olivares", "Benacazón", "Aznalcázar-Pilas", 
+      "Huévar", "Carrión de los Céspedes", "Escacena", "Villalba", "La Palma del Condado", 
+      "Niebla", "San Juan del Puerto", "Huelva Mercancías", "Huelva"
+    ]
   };
 
   const paths: any[] = [];
-  Object.entries(estacionesPorLinea).forEach(([linea, estaciones]) => {
-    estaciones.forEach((estacion) => {
-      paths.push({ params: { linea, estacion } });
+  
+  Object.entries(MAPAS_ESTACIONES).forEach(([linea, estaciones]) => {
+    estaciones.forEach((nombreEstacion) => {
+      // Usamos 'nombreEstacion', que es la variable real del bucle
+      const slugEstacion = nombreEstacion
+        .toLowerCase()
+        .replace(/\./g, '')
+        .replace(/[\s\-]+/g, '-') 
+        .replace(/[^a-z0-9\-áéíóúñ]/g, ''); 
+
+      paths.push({ 
+        params: { 
+          linea, 
+          estacion: slugEstacion 
+        } 
+      });
     });
   });
+  
   return paths;
 }
 
 const { linea, estacion } = Astro.params;
 
-// Re-convertir el slug de la URL a un nombre legible
-const nombreLegible = estacion.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+// Diccionario inverso para mostrar el nombre perfectamente formateado en la interfaz
+const NOMBRES_FORMALES: Record<string, string> = {
+  "el-priorato": "El Priorato",
+  "lora-del-rio": "Lora del Río",
+  guadajoz: "Guadañoz",
+  "los-rosales": "Los Rosales",
+  brenes: "Brenes",
+  majarabique: "Majarabique",
+  "triangulo-tamarguillo": "Triángulo Tamarguillo",
+  "la-negrilla": "La Negrilla",
+  "c.t.t.-sevilla": "C.T.T. Sevilla",
+  "apd.-s.-jeronimo---apd.-estadio---apd.-cartuja":
+    "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja",
+  "apd.-s.-jeronimo-apd.-estadio-apd.-cartuja":
+    "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja",
+  "sevilla-santa-justa": "Sevilla Santa Justa",
+  "la-salud": "La Salud",
+  "dos-hermanas": "Dos Hermanas",
+  utrera: "Utrera",
+  "las-alcantarillas": "Las Alcantarillas S/E",
+  "las-cabezas": "Las Cabezas",
+  lebrija: "Lebrija",
+  "aeropuerto-de-jerez": "Aeropuerto de Jerez",
+  "jerez-mercancias": "Jerez-Mercancías",
+  "jerez-de-la-frontera": "Jerez de la Frontera",
+  "el-puerto-de-santa-maria": "El Puerto de Santa María",
+  "las-aletas": "Las Aletas",
+  "puerto-real": "Puerto Real",
+  "san-fernando-bahia-sur": "San Fernando-Bahía Sur",
+  cortadura: "Cortadura",
+  cadiz: "Cádiz",
+  alamillo: "Alamillo",
+  "valencina-santiponce": "Valencina-Santiponce",
+  salteras: "Salteras",
+  "villanueva-olivares": "Villanueva-Olivares",
+  benacazon: "Benacazón",
+  "aznalcazar-pilas": "Aznalcázar-Pilas",
+  huevar: "Huévar",
+  "carrion-de-los-cespedes": "Carrión de los Céspedes",
+  escacena: "Escacena",
+  villalba: "Villalba",
+  "la-palma-del-condado": "La Palma del Condado",
+  niebla: "Niebla",
+  "san-juan-del-puerto": "San Juan del Puerto",
+  "huelva-mercancias": "Huelva Mercancías",
+  huelva: "Huelva",
+};
 
-// Buscar los ficheros específicos de esta estación
-const docsDir = path.join(process.cwd(), 'public', 'docs', 'Consignas finales');
+const nombreLegible = NOMBRES_FORMALES[estacion] || estacion.replace(/-/g, " ");
+
+const docsDir = path.join(process.cwd(), "public", "docs", "Consignas finales");
 let esquemaUrl = null;
 let subestacionUrl = null;
 
 if (fs.existsSync(docsDir)) {
   const allFiles = fs.readdirSync(docsDir, { recursive: true }) as string[];
-  
-  allFiles.forEach(file => {
-    const norm = file.replace(/\\/g, '/');
-    const lower = norm.toLowerCase();
-    
-    // Verificamos si pertenece a la línea y al slug de la estación
-    if (lower.startsWith(linea + '/') && lower.includes(estacion)) {
-      const url = `/docs/Consignas finales/${norm}`;
-      if (lower.includes('s.e.') || lower.includes('subestacion')) {
-        subestacionUrl = url;
-      } else {
-        esquemaUrl = url;
+  const estacionToken = limpiarString(estacion);
+
+  allFiles.forEach((file) => {
+    const normPath = file.replace(/\\/g, "/");
+    const parts = normPath.split("/");
+
+    if (parts.length > 1 && parts[0].toLowerCase() === linea.toLowerCase()) {
+      const fileName = parts[parts.length - 1];
+      const fileNameLimpio = limpiarString(fileName);
+
+      // Control de abreviaturas del índice de planos (ej: "TR. TAMARGUILLO")
+      const matchAlternativo =
+        estacionToken.includes("triangulo tamarguillo") &&
+        fileNameLimpio.includes("tr tamarguillo");
+
+      if (fileNameLimpio.includes(estacionToken) || matchAlternativo) {
+        const urlFinal = `/docs/Consignas finales/${normPath}`;
+        if (
+          fileNameLimpio.includes("s e") ||
+          fileNameLimpio.includes("subestacion")
+        ) {
+          subestacionUrl = urlFinal;
+        } else {
+          esquemaUrl = urlFinal;
+        }
       }
     }
   });
@@ -60,59 +156,123 @@ if (fs.existsSync(docsDir)) {
   </head>
   <body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
     <main class="max-w-[1200px] mx-auto p-8 lg:p-12 w-full">
-      
-      <a href={`/${linea}`} class="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-8 transition-colors group">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4 group-hover:-translate-x-1 transition-transform"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
+      <!-- BOTÓN VOLVER -->
+      <a
+        href={`/${linea}`}
+        class="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-8 transition-colors group"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke-width="2.5"
+          stroke="currentColor"
+          class="w-4 h-4 group-hover:-translate-x-1 transition-transform"
+          ><path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"></path></svg
+        >
         Volver al esquema de línea
       </a>
 
       <!-- ENCABEZADO DE ESTACIÓN -->
-      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-8 mb-8 shadow-xl">
-        <span class="text-xs font-mono uppercase bg-emerald-950 text-emerald-400 border border-emerald-800 px-3 py-1 rounded-full">{linea.toUpperCase()}</span>
-        <h1 class="text-4xl font-black text-white mt-4 tracking-tight capitalize">{nombreLegible}</h1>
-        <p class="text-slate-400 text-sm mt-1">Espacio de gestión técnica de instalaciones y sistemas asociados.</p>
+      <div
+        class="bg-slate-900 border border-slate-800 rounded-3xl p-8 mb-8 shadow-xl"
+      >
+        <span
+          class="text-xs font-mono uppercase bg-emerald-950 text-emerald-400 border border-emerald-800 px-3 py-1 rounded-full"
+          >{linea.toUpperCase()}</span
+        >
+        <h1 class="text-4xl font-black text-white mt-4 tracking-tight">
+          {nombreLegible}
+        </h1>
+        <p class="text-slate-400 text-sm mt-1">
+          Espacio de gestión técnica de instalaciones y sistemas asociados.
+        </p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
         <!-- SECCIÓN IZQUIERDA: DOCUMENTACIÓN EXISTENTE -->
         <div class="md:col-span-1 flex flex-col gap-4">
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-md">
-            <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Planos de Electrificación</h2>
-            
-            <div class="flex flex-col gap-3">
-              {esquemaUrl ? (
-                <a href={esquemaUrl} target="_blank" class="w-full bg-slate-950 hover:bg-sky-900/20 text-sky-400 py-3 px-4 rounded-xl border border-slate-800 hover:border-sky-900/60 transition-all flex items-center justify-between font-medium text-xs">
-                  <span>Esquema de Estación</span>
-                  <span class="font-mono opacity-50">PDF</span>
-                </a>
-              ) : (
-                <p class="text-xs text-slate-600 italic">No hay planos de estación cargados.</p>
-              )}
+          <div
+            class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-md"
+          >
+            <h2
+              class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4"
+            >
+              Planos de Electrificación
+            </h2>
 
-              {subestacionUrl ? (
-                <a href={subestacionUrl} target="_blank" class="w-full bg-slate-950 hover:bg-amber-900/20 text-amber-400 py-3 px-4 rounded-xl border border-slate-800 hover:border-amber-900/60 transition-all flex items-center justify-between font-medium text-xs">
-                  <span>Subestación de Tracción</span>
-                  <span class="font-mono opacity-50">PDF</span>
-                </a>
-              ) : (
-                <p class="text-xs text-slate-600 italic">No dispone de Subestación (S/E).</p>
-              )}
+            <div class="flex flex-col gap-3">
+              {
+                esquemaUrl ? (
+                  <a
+                    href={esquemaUrl}
+                    target="_blank"
+                    class="w-full bg-slate-950 hover:bg-sky-900/20 text-sky-400 py-3 px-4 rounded-xl border border-slate-800 hover:border-sky-900/60 transition-all flex items-center justify-between font-medium text-xs"
+                  >
+                    <span>Esquema de Estación</span>
+                    <span class="font-mono opacity-50">PDF</span>
+                  </a>
+                ) : (
+                  <p class="text-xs text-slate-600 italic px-1">
+                    No hay planos de estación cargados.
+                  </p>
+                )
+              }
+
+              {
+                subestacionUrl ? (
+                  <a
+                    href={subestacionUrl}
+                    target="_blank"
+                    class="w-full bg-slate-950 hover:bg-amber-900/20 text-amber-400 py-3 px-4 rounded-xl border border-slate-800 hover:border-amber-900/60 transition-all flex items-center justify-between font-medium text-xs"
+                  >
+                    <span>Subestación de Tracción</span>
+                    <span class="font-mono opacity-50">PDF</span>
+                  </a>
+                ) : (
+                  <p class="text-xs text-slate-600 italic px-1">
+                    No dispone de Subestación (S/E).
+                  </p>
+                )
+              }
             </div>
           </div>
         </div>
 
-        <!-- SECCIÓN DERECHA: PROCESO DE EXPANSIÓN FUTURA -->
-        <div class="md:col-span-2 bg-slate-900 border border-slate-800 border-dashed rounded-2xl p-8 flex flex-col justify-center items-center text-center">
-          <div class="w-12 h-12 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-center text-slate-500 mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+        <!-- SECCIÓN DERECHA: EXPANSIÓN DE MÓDULOS FUTUROS -->
+        <div
+          class="md:col-span-2 bg-slate-900 border border-slate-800 border-dashed rounded-2xl p-8 flex flex-col justify-center items-center text-center min-h-[250px]"
+        >
+          <div
+            class="w-12 h-12 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-center text-slate-500 mb-4"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="2"
+              stroke="currentColor"
+              class="w-5 h-5"
+              ><path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+              ></path></svg
+            >
           </div>
-          <h3 class="text-slate-300 font-bold mb-1">Módulo de Datos de Estación</h3>
+          <h3 class="text-slate-300 font-bold mb-1">
+            Módulo de Datos de Estación
+          </h3>
           <p class="text-slate-500 text-xs max-w-sm leading-relaxed">
-            Aquí podrás integrar próximamente telemedidas en tiempo real, histórico de alarmas de enclavamientos o fichas de mantenimiento de catenaria.
+            Espacio preparado para integrar telemedidas en tiempo real,
+            telecontrol de subestaciones, histórico de alarmas de enclavamientos
+            o fichas de mantenimiento de catenaria.
           </p>
         </div>
       </div>
-
     </main>
   </body>
 </html>

@@ -115,8 +115,14 @@ const svgPoints = nombresEstacionesOrdenadas.map(name => `${estacionesAgrupadas[
               const info = estacionesAgrupadas[nombre];
               const posX = info.x * 15;
               const posY = info.y * 7;
-              // URL amigable para la subpágina (ej: /pe-24/dos-hermanas)
-              const urlEstacion = `/${linea}/${nombre.toLowerCase().replace(/\s+/g, '-')}`;
+              
+              // Lógica de generación de slug idéntica a [estacion].astro para evitar variaciones de guiones
+              const slugEstacion = nombre
+                .toLowerCase()
+                .replace(/[\s\-]+/g, '-')
+                .replace(/[^a-z0-9\-áéíóúñ]/g, '');
+
+              const urlEstacion = `/${linea}/${slugEstacion}`;
 
               return (
                 <g class="cursor-pointer group select-none" onclick={`window.location.href = '${urlEstacion}'`}>
