@@ -1,60 +1,5 @@
 ---
-import fs from 'node:fs';
-import path from 'node:path';
 import '../styles/global.css';
-
-// 1. Ruta física hacia la subcarpeta de consignas
-const docsDir = path.join(process.cwd(), 'public', 'docs', 'Consignas finales');
-let rawFiles: string[] = [];
-
-if (fs.existsSync(docsDir)) {
-  // Buscamos de forma recursiva
-  const allFiles = fs.readdirSync(docsDir, { recursive: true }) as string[];
-  // Filtramos por PDF
-  rawFiles = allFiles.filter(file => file.endsWith('.pdf'));
-}
-
-// 2. Procesamos y aplanamos la lista de archivos
-const todasLasEstaciones = rawFiles.map((filePath) => {
-  // Normalizamos las barras de las rutas para entornos Linux/Vercel (cambiar \ por /)
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  
-  // Extraemos el nombre del archivo final (ej. "01_El Priorato.pdf")
-  const fileName = normalizedPath.split('/').pop() || '';
-  
-  // Limpiamos el prefijo numérico (ej. "01_El Priorato" -> "El Priorato")
-  const cleanName = fileName
-    .replace('.pdf', '')
-    .replace(/^\d+_/,'')
-    .replace(/_/g, ' ');
-
-  // Clasificamos si es una subestación o estación
-  const esSubestacion = fileName.toLowerCase().includes('s.e.') || fileName.toLowerCase().includes('subestacion');
-
-  // Identificamos la línea por el nombre de la carpeta (ej. pe-17)
-  const linea = normalizedPath.split('/')[0].toUpperCase();
-
-  return {
-    nombre: cleanName,
-    url: `/docs/Consignas finales/${normalizedPath}`,
-    esSubestacion,
-    linea
-  };
-});
-
-// 3. NUEVA LÓGICA: Agrupamos las estaciones por código de línea
-// Esto crea un objeto tipo: { 'PE-17': [...estaciones], 'PE-24': [...estaciones] }
-const estacionesAgrupadas = todasLasEstaciones.reduce((agrupacion, estacion) => {
-  const linea = estacion.linea;
-  if (!agrupacion[linea]) {
-    agrupacion[linea] = [];
-  }
-  agrupacion[linea].push(estacion);
-  return agrupacion;
-}, {} as Record<string, typeof todasLasEstaciones>);
-
-// 4. Obtenemos los códigos de línea ordenados alfabéticamente (ej. PE-17, PE-24)
-const codigosDeLinea = Object.keys(estacionesAgrupadas).sort();
 ---
 
 <html lang="es">
@@ -62,78 +7,83 @@ const codigosDeLinea = Object.keys(estacionesAgrupadas).sort();
     <meta charset="utf-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width" />
-    <title>Visor de Consignas - Agrupado por Línea</title>
+    <title>Portal de Consignas - Adif Electrificación</title>
   </head>
-  <body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+  <body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-center items-center p-6">
     
-    <!-- CONTENIDO PRINCIPAL -->
-    <main class="max-w-[1900px] mx-auto p-12 w-full">
+    <div class="max-w-4xl w-full text-center mb-12">
+      <span class="text-xs font-mono tracking-widest uppercase bg-emerald-950 text-emerald-400 border border-emerald-800 px-3 py-1 rounded-full">
+        Red Convencional Sur
+      </span>
+      <h1 class="text-4xl md:text-5xl font-black tracking-tight text-white mt-4 mb-2">
+        Visor de Consignas de Electrificación
+      </h1>
+      <p class="text-slate-400 text-base md:text-lg">
+        Selecciona una línea ferroviaria para inspeccionar su esquema y subestaciones asociadas.
+      </p>
+    </div>
+
+    <!-- PANEL DE SELECCIÓN DE LÍNEAS -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl w-full">
       
-      {codigosDeLinea.length > 0 ? (
-        // Iteramos sobre cada código de línea (PE-17, PE-24, etc.)
-        codigosDeLinea.map((codigoLinea) => (
-          // Sección separada para cada línea con margen inferior
-          <section class="mb-16 last:mb-0">
-            
-            <!-- TÍTULO DE LA DIVISIÓN DE LÍNEA -->
-            <div class="flex items-center gap-4 mb-8 border-b border-slate-800 pb-4">
-              <span class="text-xs font-mono uppercase bg-emerald-950 text-emerald-300 border border-emerald-800 px-3 py-1 rounded">
-                {codigoLinea}
-              </span>
-              <h2 class="text-3xl font-bold tracking-tight text-slate-100">
-                Consignas {codigoLinea}
-              </h2>
-              <span class="text-sm font-mono text-slate-600">
-                ({estacionesAgrupadas[codigoLinea].length} elementos)
-              </span>
-            </div>
-
-            <!-- REJILLA DE ESTACIONES PARA ESTA LÍNEA ESPECÍFICA -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {estacionesAgrupadas[codigoLinea].map((estacion) => (
-                // Diseño de tarjeta (mismo estilo que image_12.png)
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-lg">
-                  <div class="mb-6">
-                    <div class="flex justify-between items-start mb-3 gap-2">
-                      <span class="text-xs font-mono uppercase bg-slate-800 text-slate-400 border border-slate-700 px-2.5 py-1 rounded">
-                        {estacion.linea}
-                      </span>
-                      <span class={`text-xs font-mono font-bold uppercase px-2.5 py-1 rounded border ${
-                        estacion.esSubestacion 
-                          ? 'bg-amber-950/50 text-amber-300 border-amber-900/60' 
-                          : 'bg-sky-950/50 text-sky-300 border-sky-900/60'
-                      }`}>
-                        {estacion.esSubestacion ? 'Subestación (S/E)' : 'Esquema Estación'}
-                      </span>
-                    </div>
-                    <h3 class="text-xl font-bold text-slate-100 leading-tight">
-                      {estacion.nombre}
-                    </h3>
-                  </div>
-                  
-                  <a 
-                    href={estacion.url} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    class="w-full text-center bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm py-3 px-5 rounded-lg border border-slate-700 hover:border-slate-600 transition-all duration-150 shadow-sm flex items-center justify-center gap-2"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4.5 h-4.5">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                    </svg>
-                    Abrir Documentación Técnica
-                  </a>
-                </div>
-              ))}
-            </div>
-
-          </section>
-        ))
-      ) : (
-        <div class="text-center py-20 bg-slate-900 border-2 border-slate-800 border-dashed rounded-3xl">
-          <p class="text-slate-500 text-lg">No se han encontrado consignas cargadas.</p>
+      <!-- LINEA PE-17 -->
+      <a href="/pe-17" class="group bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-8 flex flex-col justify-between shadow-xl transition-all duration-300 hover:-translate-y-1">
+        <div>
+          <div class="w-12 h-12 rounded-xl bg-emerald-950 border border-emerald-800 flex items-center justify-center text-emerald-400 font-bold mb-6 group-hover:bg-emerald-900/50">
+            17
+          </div>
+          <h2 class="text-2xl font-bold text-white mb-2 group-hover:text-emerald-400 transition-colors">P.E. 17</h2>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Línea de Madrid a Sevilla (Tramo El Priorato - Sevilla Santa Justa).
+          </p>
         </div>
-      )}
-    </main>
+        <div class="mt-8 flex items-center text-xs font-semibold text-emerald-400 gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+          Entrar al mapa 
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </svg>
+        </div>
+      </a>
+
+      <!-- LINEA PE-24 -->
+      <a href="/pe-24" class="group bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-2xl p-8 flex flex-col justify-between shadow-xl transition-all duration-300 hover:-translate-y-1">
+        <div>
+          <div class="w-12 h-12 rounded-xl bg-sky-950 border border-sky-800 flex items-center justify-center text-sky-400 font-bold mb-6 group-hover:bg-sky-900/50">
+            24
+          </div>
+          <h2 class="text-2xl font-bold text-white mb-2 group-hover:text-sky-400 transition-colors">P.E. 24</h2>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Línea de Sevilla a Cádiz (Esquema secuencial de estaciones y SS/EE).
+          </p>
+        </div>
+        <div class="mt-8 flex items-center text-xs font-semibold text-sky-400 gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+          Entrar al mapa 
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </svg>
+        </div>
+      </a>
+
+      <!-- LINEA PE-26 -->
+      <a href="/pe-26" class="group bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-8 flex flex-col justify-between shadow-xl transition-all duration-300 hover:-translate-y-1">
+        <div>
+          <div class="w-12 h-12 rounded-xl bg-amber-950 border border-amber-800 flex items-center justify-center text-amber-400 font-bold mb-6 group-hover:bg-amber-900/50">
+            26
+          </div>
+          <h2 class="text-2xl font-bold text-white mb-2 group-hover:text-amber-400 transition-colors">P.E. 26</h2>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Línea de Bifurcación Los Naranjos a Huelva.
+          </p>
+        </div>
+        <div class="mt-8 flex items-center text-xs font-semibold text-amber-400 gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+          Entrar al mapa 
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </svg>
+        </div>
+      </a>
+
+    </div>
 
   </body>
 </html>

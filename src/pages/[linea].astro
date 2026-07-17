@@ -1,0 +1,196 @@
+---
+import fs from 'node:fs';
+import path from 'node:path';
+import '../../styles/global.css';
+
+// Generación de rutas dinámicas estáticas para Vercel
+export function getStaticPaths() {
+  return [
+    { params: { linea: 'pe-17' } },
+    { params: { linea: 'pe-24' } },
+    { params: { linea: 'pe-26' } },
+  ];
+}
+
+const { linea } = Astro.params;
+const codigoLineaUpper = linea.toUpperCase();
+
+// Lógica de lectura física de archivos
+const docsDir = path.join(process.cwd(), 'public', 'docs', 'Consignas finales');
+let rawFiles: string[] = [];
+
+if (fs.existsSync(docsDir)) {
+  const allFiles = fs.readdirSync(docsDir, { recursive: true }) as string[];
+  // Filtrar solo los archivos que pertenecen a la carpeta de esta línea concreta
+  rawFiles = allFiles.filter(file => 
+    file.replace(/\\/g, '/').toUpperCase().startsWith(codigoLineaUpper + '/') && file.endsWith('.pdf')
+  );
+}
+
+// Agrupación y extracción del prefijo numérico
+const estacionesAgrupadas: Record<string, { esquemaUrl?: string; subestacionUrl?: string; orden: number }> = {};
+
+rawFiles.forEach((filePath) => {
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const fileName = normalizedPath.split('/').pop() || '';
+
+  const esSubestacion = fileName.toLowerCase().includes('s.e.') || fileName.toLowerCase().includes('subestacion');
+  const matchNumero = fileName.match(/^(\d+)_/);
+  const numeroOrden = matchNumero ? parseInt(matchNumero[1], 10) : 999;
+
+  let nombreEstacion = fileName
+    .replace('.pdf', '')
+    .replace(/^\d+_/,'') 
+    .replace(/subestacion/gi, '')
+    .replace(/subestación/gi, '')
+    .replace(/s\.e\./gi, '')
+    .replace(/_/g, ' ')  
+    .replace(/\s+/g, ' ') 
+    .trim();
+
+  if (!nombreEstacion) {
+    nombreEstacion = fileName.replace('.pdf', '').replace(/^\d+_/,'').trim();
+  }
+
+  if (!estacionesAgrupadas[nombreEstacion]) {
+    estacionesAgrupadas[nombreEstacion] = { orden: numeroOrden };
+  }
+
+  const urlPublica = `/docs/Consignas finales/${normalizedPath}`;
+  if (esSubestacion) {
+    estacionesAgrupadas[nombreEstacion].subestacionUrl = urlPublica;
+  } else {
+    estacionesAgrupadas[nombreEstacion].esquemaUrl = urlPublica;
+  }
+  
+  if (numeroOrden < estacionesAgrupadas[nombreEstacion].orden) {
+    estacionesAgrupadas[nombreEstacion].orden = numeroOrden;
+  }
+});
+
+// Ordenar de forma secuencial exacta
+const nombresEstacionesOrdenadas = Object.keys(estacionesAgrupadas).sort((a, b) => {
+  return estacionesAgrupadas[a].orden - estacionesAgrupadas[b].orden;
+});
+---
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Mapa Interactivo - {codigoLineaUpper}</title>
+  </head>
+  <body class="bg-slate-950 text-slate-100 min-h-screen font-sans dynamic-scroll">
+    
+    <main class="max-w-[1900px] mx-auto p-8 lg:p-12 w-full">
+      
+      <!-- BOTÓN VOLVER -->
+      <a href="/" class="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-6 transition-colors group">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4 group-hover:-translate-x-1 transition-transform">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+        </svg>
+        Volver al selector de líneas
+      </a>
+
+      <!-- CABECERA -->
+      <div class="flex items-center gap-4 mb-10 border-b border-slate-800 pb-6">
+        <span class="text-xs font-mono uppercase bg-emerald-950 text-emerald-300 border border-emerald-800 px-3 py-1 rounded">
+          {codigoLineaUpper}
+        </span>
+        <h1 class="text-3xl lg:text-4xl font-bold tracking-tight text-white">
+          Esquema de Electrificación Interactivo
+        </h1>
+      </div>
+
+      <!-- ================= MAPA 2D INTERACTIVO LINEAL ================= -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 mb-12 shadow-2xl overflow-x-auto">
+        <h2 class="text-sm font-semibold uppercase text-slate-400 tracking-wider mb-8">
+          Trazado Esquemático de la Línea (Nodos de Estación)
+        </h2>
+        
+        <div class="relative flex items-center justify-between min-w-[1200px] px-8 py-6">
+          <!-- Línea física del trazado ferroviario -->
+          <div class="absolute left-12 right-12 top-1/2 h-1 bg-gradient-to-r from-emerald-500 via-sky-500 to-amber-500 -translate-y-1/2 z-0 rounded-full opacity-60"></div>
+
+          {nombresEstacionesOrdenadas.map((nombre, index) => {
+            const info = estacionesAgrupadas[nombre];
+            // Generamos un ID seguro para hacer scroll
+            const elementId = `estacion-${nombre.toLowerCase().replace(/\s+/g, '-')}`;
+            
+            return (
+              <div class="relative z-10 flex flex-col items-center group">
+                <!-- Identificador visual del nodo (Círculo ferroviario) -->
+                <button
+                  onclick={`document.getElementById('${elementId}')?.scrollIntoView({ behavior: 'smooth', block: 'center' })`}
+                  class="w-7 h-7 rounded-full bg-slate-950 border-4 border-slate-700 group-hover:border-emerald-400 group-hover:scale-125 transition-all duration-200 shadow-xl flex items-center justify-center cursor-pointer"
+                  title={`Saltar a ${nombre}`}
+                >
+                  <div class="w-1.5 h-1.5 rounded-full bg-slate-800 group-hover:bg-emerald-400"></div>
+                </button>
+
+                <!-- Etiqueta del Nombre (Alternando arriba/abajo para que no colisionen) -->
+                <div class={`absolute ${index % 2 === 0 ? 'top-9' : '-top-12'} flex flex-col items-center w-36 text-center transition-all duration-200 group-hover:scale-105`}>
+                  <span class="text-[11px] font-bold text-slate-300 group-hover:text-white leading-tight block truncate w-full">
+                    {nombre}
+                  </span>
+                  <span class="text-[9px] font-mono text-slate-500 uppercase mt-0.5">
+                    {info.subestacionUrl ? 'Estación + S/E' : 'Estación'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <!-- ================= REJILLA DE TARJETAS DETALLADAS ================= -->
+      <h2 class="text-xl font-bold text-white mb-6">Documentación Técnica Vinculada</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {nombresEstacionesOrdenadas.map((nombre) => {
+          const info = estacionesAgrupadas[nombre];
+          const elementId = `estacion-${nombre.toLowerCase().replace(/\s+/g, '-')}`;
+
+          return (
+            <div 
+              id={elementId}
+              class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-lg hover:border-slate-600 transition-all scroll-mt-24 target:border-emerald-500 target:ring-1 target:ring-emerald-500"
+            >
+              <div class="mb-6">
+                <span class="text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded inline-block mb-2">
+                  Prog: {info.orden.toString().padStart(2, '0')}
+                </span>
+                <h3 class="text-xl font-bold text-slate-100 leading-tight">
+                  {nombre}
+                </h3>
+              </div>
+              
+              <div class="flex flex-col gap-2.5">
+                {info.esquemaUrl && (
+                  <a href={info.esquemaUrl} target="_blank" rel="noreferrer" class="w-full bg-slate-800 hover:bg-sky-900/40 text-sky-400 hover:text-sky-300 font-medium text-xs py-3 px-4 rounded-xl border border-slate-700 hover:border-sky-800 transition-all flex items-center justify-between group">
+                    <span class="flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8m-6-3.75h6m-9 6h12A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.625C4.409 3.75 3.375 4.784 3.375 6v12A2.25 2.25 0 0 0 5.625 20.25Z" /></svg>
+                      Esquema de Estación
+                    </span>
+                    <span class="text-[10px] bg-sky-950 px-2 py-0.5 rounded border border-sky-900 text-sky-400 font-mono">PDF</span>
+                  </a>
+                )}
+
+                {info.subestacionUrl && (
+                  <a href={info.subestacionUrl} target="_blank" rel="noreferrer" class="w-full bg-slate-800 hover:bg-amber-900/40 text-amber-400 hover:text-amber-300 font-medium text-xs py-3 px-4 rounded-xl border border-slate-700 hover:border-amber-800 transition-all flex items-center justify-between group">
+                    <span class="flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
+                      Subestación (S/E)
+                    </span>
+                    <span class="text-[10px] bg-amber-950 px-2 py-0.5 rounded border border-amber-900 text-amber-400 font-mono">PDF</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </main>
+  </body>
+</html>
