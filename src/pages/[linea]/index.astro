@@ -1,0 +1,135 @@
+---
+import fs from 'node:fs';
+import path from 'node:path';
+import '../../styles/global.css';
+
+export function getStaticPaths() {
+  return [
+    { params: { linea: 'pe-17' } },
+    { params: { linea: 'pe-24' } },
+    { params: { linea: 'pe-26' } },
+  ];
+}
+
+const { linea } = Astro.params;
+const codigoLineaUpper = linea.toUpperCase();
+
+const CONFIG_MAPAS: Record<string, Record<string, { x: number; y: number }>> = {
+  "PE-17": {
+    "El Priorato": { x: 85, y: 15 }, "Lora del Río": { x: 78, y: 22 }, "Guadañoz": { x: 70, y: 30 },
+    "Los Rosales": { x: 62, y: 38 }, "Brenes": { x: 54, y: 46 }, "Majarabique": { x: 45, y: 55 },
+    "Triángulo Tamarguillo": { x: 45, y: 68 }, "La Negrilla": { x: 52, y: 78 }, "C.T.T. Sevilla": { x: 38, y: 72 },
+    "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja": { x: 30, y: 60 }, "Sevilla Santa Justa": { x: 35, y: 85 }
+  },
+  "PE-24": {
+    "Sevilla Santa Justa": { x: 50, y: 8 }, "La Salud": { x: 50, y: 16 }, "Dos Hermanas": { x: 50, y: 24 },
+    "Utrera": { x: 50, y: 32 }, "Las Alcantarillas": { x: 54, y: 38 }, "Las Cabezas": { x: 46, y: 44 },
+    "Lebrija": { x: 42, y: 52 }, "Aeropuerto de Jerez": { x: 38, y: 60 }, "Jerez-Mercancías": { x: 38, y: 66 },
+    "Jerez de la Frontera": { x: 34, y: 72 }, "El Puerto de Santa María": { x: 34, y: 80 }, "Las Aletas": { x: 34, y: 86 },
+    "Puerto Real": { x: 34, y: 92 }, "San Fernando-Bahía Sur": { x: 26, y: 92 }, "Cortadura": { x: 18, y: 84 }, "Cádiz": { x: 18, y: 74 }
+  },
+  "PE-26": {
+    "Majarabique": { x: 90, y: 30 }, "Alamillo": { x: 82, y: 35 }, "Apd. S. Jerónimo-Apd. Estadio-Apd. Cartuja": { x: 82, y: 45 },
+    "Valencina-Santiponce": { x: 74, y: 30 }, "Salteras": { x: 67, y: 35 }, "Villanueva-Olivares": { x: 60, y: 38 },
+    "Benacazón": { x: 53, y: 42 }, "Aznalcázar-Pilas": { x: 46, y: 45 }, "Huévar": { x: 40, y: 48 },
+    "Carrión de los Céspedes": { x: 34, y: 50 }, "Escacena": { x: 28, y: 52 }, "Villalba": { x: 23, y: 54 },
+    "La Palma del Condado": { x: 18, y: 56 }, "Niebla": { x: 14, y: 60 }, "San Juan del Puerto": { x: 10, y: 65 },
+    "Huelva Mercancías": { x: 8, y: 72 }, "Huelva": { x: 8, y: 82 }
+  }
+};
+
+const docsDir = path.join(process.cwd(), 'public', 'docs', 'Consignas finales');
+let rawFiles: string[] = [];
+
+if (fs.existsSync(docsDir)) {
+  const allFiles = fs.readdirSync(docsDir, { recursive: true }) as string[];
+  rawFiles = allFiles.filter(file => 
+    file.replace(/\\/g, '/').toUpperCase().startsWith(codigoLineaUpper + '/') && file.endsWith('.pdf')
+  );
+}
+
+const estacionesAgrupadas: Record<string, { orden: number; x: number; y: number; tieneSub: boolean }> = {};
+const coordMapa = CONFIG_MAPAS[codigoLineaUpper] || {};
+
+rawFiles.forEach((filePath) => {
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const fileName = normalizedPath.split('/').pop() || '';
+  const esSubestacion = fileName.toLowerCase().includes('s.e.') || fileName.toLowerCase().includes('subestacion');
+  const matchNumero = fileName.match(/^(\d+)_/);
+  const numeroOrden = matchNumero ? parseInt(matchNumero[1], 10) : 999;
+
+  let nombreEstacion = fileName.replace('.pdf', '').replace(/^\d+_/,'').replace(/subestacion/gi, '').replace(/subestación/gi, '').replace(/s\.e\./gi, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!nombreEstacion) nombreEstacion = fileName.replace('.pdf', '').replace(/^\d+_/,'').trim();
+
+  const nombreClave = Object.keys(coordMapa).find(k => k.toLowerCase() === nombreEstacion.toLowerCase()) || nombreEstacion;
+  const coords = coordMapa[nombreClave] || { x: 50, y: 50 };
+
+  if (!estacionesAgrupadas[nombreClave]) {
+    estacionesAgrupadas[nombreClave] = { orden: numeroOrden, x: coords.x, y: coords.y, tieneSub: false };
+  }
+  if (esSubestacion) estacionesAgrupadas[nombreClave].tieneSub = true;
+  if (numeroOrden < estacionesAgrupadas[nombreClave].orden) estacionesAgrupadas[nombreClave].orden = numeroOrden;
+});
+
+const nombresEstacionesOrdenadas = Object.keys(estacionesAgrupadas).sort((a, b) => estacionesAgrupadas[a].orden - estacionesAgrupadas[b].orden);
+const svgPoints = nombresEstacionesOrdenadas.map(name => `${estacionesAgrupadas[name].x * 15},${estacionesAgrupadas[name].y * 7}`).join(' ');
+---
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Mapa de Línea - {codigoLineaUpper}</title>
+  </head>
+  <body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+    <main class="max-w-[1600px] mx-auto p-8 w-full">
+      
+      <a href="/" class="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-6 transition-colors group">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4 group-hover:-translate-x-1 transition-transform"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
+        Volver al selector
+      </a>
+
+      <div class="flex items-center gap-4 mb-8 border-b border-slate-800 pb-4">
+        <span class="text-xs font-mono uppercase bg-emerald-950 text-emerald-300 border border-emerald-800 px-3 py-1 rounded">{codigoLineaUpper}</span>
+        <h1 class="text-2xl font-bold tracking-tight text-white">Esquema General de la Línea</h1>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl overflow-hidden">
+        <div class="mb-4">
+          <h2 class="text-xs font-bold uppercase text-slate-400 tracking-widest">Panel de Control General</h2>
+          <p class="text-[11px] text-slate-500 mt-0.5">Haz clic sobre cualquier estación en el mapa para acceder a su espacio de datos particular.</p>
+        </div>
+
+        <div class="w-full overflow-auto flex justify-center py-6">
+          <svg class="w-[1500px] h-[750px] bg-slate-950/40 rounded-2xl border border-slate-800/80" viewBox="0 0 1500 750">
+            <polyline points={svgPoints} fill="none" stroke="#334155" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+            <polyline points={svgPoints} fill="none" stroke="url(#railGradient)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <defs>
+              <linearGradient id="railGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#10b981" /><stop offset="50%" stop-color="#06b6d4" /><stop offset="100%" stop-color="#f59e0b" />
+              </linearGradient>
+            </defs>
+
+            {nombresEstacionesOrdenadas.map((nombre) => {
+              const info = estacionesAgrupadas[nombre];
+              const posX = info.x * 15;
+              const posY = info.y * 7;
+              // URL amigable para la subpágina (ej: /pe-24/dos-hermanas)
+              const urlEstacion = `/${linea}/${nombre.toLowerCase().replace(/\s+/g, '-')}`;
+
+              return (
+                <g class="cursor-pointer group select-none" onclick={`window.location.href = '${urlEstacion}'`}>
+                  <circle cx={posX} cy={posY} r="14" fill="#10b981" class="opacity-0 group-hover:opacity-20 transition-all duration-200" />
+                  <circle cx={posX} cy={posY} r="8" fill="#020617" stroke={info.tieneSub ? "#f59e0b" : "#06b6d4"} stroke-width="3" class="group-hover:stroke-white transition-all duration-200" />
+                  <circle cx={posX} cy={posY} r="3" fill={info.tieneSub ? "#f59e0b" : "#06b6d4"} />
+                  <text x={posX} y={posY - 14} text-anchor="middle" class="fill-slate-400 font-sans font-bold text-[11px] group-hover:fill-white transition-colors duration-150">{nombre}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
