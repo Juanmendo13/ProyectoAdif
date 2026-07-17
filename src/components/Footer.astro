@@ -1,0 +1,22 @@
+---
+const añoActual = new Date().getFullYear();
+---
+<footer class="w-full border-t border-slate-900 bg-slate-950 mt-auto shadow-inner">
+  <div class="max-w-[1600px] mx-auto px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-6 font-sans text-sm text-slate-400">
+    <div class="flex items-center gap-2.5">
+      <span class="font-mono font-medium text-slate-500">© {añoActual}</span>
+      <span class="text-slate-300">Módulo de Gestión de Red e Infraestructura Ferroviaria</span>
+    </div>
+    
+    <div class="flex items-center gap-8 font-mono text-xs">
+      <div class="flex items-center gap-2 bg-slate-900/50 px-3 py-1.5 rounded-md border border-slate-800/40">
+        <span class="w-2 h-2 rounded-full bg-cyan-500"></span>
+        <span class="text-slate-400">Red Eléctrica OK</span>
+      </div>
+      <div class="flex items-center gap-2 bg-slate-900/50 px-3 py-1.5 rounded-md border border-slate-800/40">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        <span class="text-slate-400">Servidor RT Estable</span>
+      </div>
+    </div>
+  </div>
+</footer>

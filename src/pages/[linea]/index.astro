@@ -2,6 +2,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import '../../styles/global.css';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
 
 export function getStaticPaths() {
   return [
@@ -23,28 +25,35 @@ const CONFIG_MAPAS: Record<string, Record<string, { x: number; y: number }>> = {
     "Los Rosales":                                    { x: 64, y: 28 },
     "Brenes":                                         { x: 57, y: 34 },
     "Majarabique":                                    { x: 50, y: 40 },
-    "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja": { x: 38, y: 52 }, // Ramal izquierdo muerto
-    "Triángulo Tamarguillo":                          { x: 50, y: 52 }, // Recto hacia abajo
-    "C.T.T. Sevilla":                                 { x: 44, y: 64 }, // Desvío inferior izquierdo
-    "Sevilla Santa Justa":                            { x: 38, y: 74 }, // Fin de Santa Justa
-    "La Negrilla":                                    { x: 58, y: 68 }  // Desvío inferior derecho
+    "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja": { x: 38, y: 52 },
+    "Triángulo Tamarguillo":                          { x: 50, y: 52 },
+    "C.T.T. Sevilla":                                 { x: 44, y: 64 },
+    "Sevilla Santa Justa":                            { x: 38, y: 74 },
+    "La Negrilla":                                    { x: 58, y: 68 }
   },
   "PE-24": {
-    "Sevilla Santa Justa":      { x: 50, y: 8 },    "La Salud":                 { x: 50, y: 16 },
-    "Dos Hermanas":             { x: 50, y: 24 },   "Utrera":                   { x: 50, y: 32 },
-    "Las Alcantarillas":        { x: 46, y: 38 },   "Las Cabezas":              { x: 42, y: 44 },
-    "Lebrija":                  { x: 38, y: 50 },   "Aeropuerto de Jerez":      { x: 34, y: 56 },
-    "Jerez-Mercancías":         { x: 30, y: 62 },   "Jerez de la Frontera":     { x: 26, y: 68 },
-    "El Puerto de Santa María": { x: 26, y: 76 },   "Las Aletas":               { x: 26, y: 82 },
-    "Puerto Real":              { x: 26, y: 88 },   "San Fernando-Bahía Sur":   { x: 18, y: 92 },
-    "Cortadura":                { x: 12, y: 84 },   "Cádiz":                    { x: 12, y: 74 }
+    "Sevilla Santa Justa":      { x: 50, y: 8 },
+    "La Salud":                 { x: 50, y: 16 },
+    "Dos Hermanas":             { x: 50, y: 24 },
+    "Utrera":                   { x: 50, y: 32 },
+    "Las Alcantarillas":        { x: 46, y: 38 },
+    "Las Cabezas":              { x: 42, y: 44 },
+    "Lebrija":                  { x: 38, y: 50 },
+    "Aeropuerto de Jerez":      { x: 34, y: 56 },
+    "Jerez-Mercancías":         { x: 30, y: 62 },
+    "Jerez de la Frontera":     { x: 26, y: 68 },
+    "El Puerto de Santa María": { x: 26, y: 76 },
+    "Las Aletas":               { x: 26, y: 82 },
+    "Puerto Real":              { x: 26, y: 88 },
+    "San Fernando-Bahía Sur":   { x: 18, y: 92 },
+    "Cortadura":                { x: 12, y: 84 },
+    "Cádiz":                    { x: 12, y: 74 }
   },
   "PE-26": {
-    "Majarabique":                                    { x: 92, y: 25 }, // Extremo derecho del tronco
-    "Alamillo":                                       { x: 84, y: 27 }, // Sigue la línea recta
-    "Apd. S. Jerónimo-Apd. Estadio-Apd. Cartuja":     { x: 88, y: 39 }, // Bifurcación hacia ABAJO
-    "Valencina-Santiponce":                           { x: 76, y: 29 }, // El tronco continúa recto
-    // Los demás se quedan igual para mantener la preciosa curva descendente a Huelva:
+    "Majarabique":                                    { x: 92, y: 25 },
+    "Alamillo":                                       { x: 84, y: 27 },
+    "Apd. S. Jerónimo-Apd. Estadio-Apd. Cartuja":     { x: 88, y: 39 },
+    "Valencina-Santiponce":                           { x: 76, y: 29 },
     "Salteras":                                       { x: 69, y: 33 },
     "Villanueva-Olivares":                            { x: 62, y: 36 },
     "Benacazón":                                      { x: 55, y: 40 },
@@ -61,16 +70,11 @@ const CONFIG_MAPAS: Record<string, Record<string, { x: number; y: number }>> = {
   }
 };
 
-// 2. DEFINICIÓN DE TRAMOS REALES DE VÍAS (Evita las uniones secuenciales erróneas)
 const TRAMOS_VIAS: Record<string, string[][]> = {
   "pe-17": [
-    // Tronco principal de bajada
     ["El Priorato", "Lora del Río", "Guadañoz", "Los Rosales", "Brenes", "Majarabique"],
-    // Bifurcación 1: De Majarabique al Apeadero
     ["Majarabique", "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja"],
-    // Bifurcación 2: De Majarabique al Triángulo
     ["Majarabique", "Triángulo Tamarguillo"],
-    // Salidas del Triángulo
     ["Triángulo Tamarguillo", "C.T.T. Sevilla", "Sevilla Santa Justa"],
     ["Triángulo Tamarguillo", "La Negrilla"]
   ],
@@ -78,29 +82,19 @@ const TRAMOS_VIAS: Record<string, string[][]> = {
     ["Sevilla Santa Justa", "La Salud", "Dos Hermanas", "Utrera", "Las Alcantarillas", "Las Cabezas", "Lebrija", "Aeropuerto de Jerez", "Jerez-Mercancías", "Jerez de la Frontera", "El Puerto de Santa María", "Las Aletas", "Puerto Real", "San Fernando-Bahía Sur", "Cortadura", "Cádiz"]
   ],
   "pe-26": [
-    // Tronco principal recto y continuo hacia Huelva
-    [
-      "Majarabique", "Alamillo", "Valencina-Santiponce", "Salteras", 
-      "Villanueva-Olivares", "Benacazón", "Aznalcázar-Pilas", "Huévar", 
-      "Carrión de los Céspedes", "Escacena", "Villalba", "La Palma del Condado", 
-      "Niebla", "San Juan del Puerto", "Huelva Mercancías", "Huelva"
-    ],
-    // Bifurcación: Ramal que cuelga hacia el sur desde el entorno de Alamillo / Majarabique
+    ["Majarabique", "Alamillo", "Valencina-Santiponce", "Salteras", "Villanueva-Olivares", "Benacazón", "Aznalcázar-Pilas", "Huévar", "Carrión de los Céspedes", "Escacena", "Villalba", "La Palma del Condado", "Niebla", "San Juan del Puerto", "Huelva Mercancías", "Huelva"],
     ["Alamillo", "Apd. S. Jerónimo-Apd. Estadio-Apd. Cartuja"]
   ]
 };
 
 const coordMapa = CONFIG_MAPAS[codigoLineaUpper] || {};
 const tramosDeEstaLinea = TRAMOS_VIAS[linea] || [];
-
-// Obtener lista única de estaciones presentes para renderizar los nodos interactivos
 const estacionesUnicas = [...new Set(tramosDeEstaLinea.flat())];
 
 const limpiarParaMatch = (str: string) => {
   return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
 };
 
-// Escaneo básico de subestaciones fijas
 const docsDir = path.join(process.cwd(), 'public', 'docs', 'Consignas finales');
 const subestacionesDetectadas = new Set<string>();
 
@@ -117,7 +111,6 @@ if (fs.existsSync(docsDir)) {
   });
 }
 
-// Mapeo final de nodos con su configuración visual escalar
 const nodosMapa = estacionesUnicas.map((nombre) => {
   const coords = coordMapa[nombre] || { x: 50, y: 50 };
   const tokenEstacion = limpiarParaMatch(nombre);
@@ -140,33 +133,31 @@ const nodosMapa = estacionesUnicas.map((nombre) => {
 });
 ---
 
-<html lang="es">
+<html lang="es" class="h-full">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width" />
     <title>Mapa de Línea - {codigoLineaUpper}</title>
   </head>
-  <body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
-    <main class="max-w-[1600px] mx-auto p-8 w-full">
-      
-      <a href="/" class="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-6 transition-colors group">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4 group-hover:-translate-x-1 transition-transform"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
-        Volver al selector
-      </a>
+  <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+    
+    <Header lineaActiva={linea} />
 
-      <div class="flex items-center gap-4 mb-8 border-b border-slate-800 pb-4">
-        <span class="text-xs font-mono uppercase bg-emerald-950 text-emerald-300 border border-emerald-800 px-3 py-1 rounded">{codigoLineaUpper}</span>
+    <main class="max-w-[1600px] mx-auto p-8 pt-8 w-full flex-1">
+      
+      <div class="flex items-center gap-4 mb-8 border-b border-slate-800 pb-5">
+        <span class="text-xs font-mono uppercase bg-emerald-950 text-emerald-300 border border-emerald-800/80 px-3 py-1 rounded font-bold">{codigoLineaUpper}</span>
         <h1 class="text-2xl font-bold tracking-tight text-white">Esquema General de la Línea</h1>
       </div>
 
       <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl overflow-hidden">
-        <div class="mb-4">
+        <div class="mb-5">
           <h2 class="text-xs font-bold uppercase text-slate-400 tracking-widest">Panel de Control General</h2>
-          <p class="text-[11px] text-slate-500 mt-0.5">Mapeo dinámico multi-ramal. Haz clic en un nodo para gestionar su documentación.</p>
+          <p class="text-xs text-slate-500 mt-1">Mapeo dinámico e interactivo. Haz clic sobre cualquier estación para abrir su consola de gestión.</p>
         </div>
 
-        <div class="w-full overflow-auto flex justify-center py-6">
+        <div class="w-full overflow-auto flex justify-center py-4">
           <svg class="w-[1500px] h-[750px] bg-slate-950/40 rounded-2xl border border-slate-800/80" viewBox="0 0 1500 750">
             
             <defs>
@@ -175,10 +166,9 @@ const nodosMapa = estacionesUnicas.map((nombre) => {
               </linearGradient>
             </defs>
 
-           {/* PINTADO DE TRAMOS DE VÍA INDEPENDIENTES */}
+            {/* TRAMOS */}
             {tramosDeEstaLinea.map((tramo) => {
               const pointsStr = tramo.map((nombreEst, idx) => {
-                // Caso especial PE-26: El ramal al apeadero nace a mitad de camino entre Majarabique y Alamillo
                 if (linea === "pe-26" && tramo.includes("Apd. S. Jerónimo-Apd. Estadio-Apd. Cartuja") && idx === 0) {
                   const m = coordMapa["Majarabique"] || { x: 92, y: 25 };
                   const a = coordMapa["Alamillo"] || { x: 84, y: 27 };
@@ -186,7 +176,6 @@ const nodosMapa = estacionesUnicas.map((nombre) => {
                   const midY = (m.y + a.y) / 2;
                   return `${midX * 15},${midY * 7}`;
                 }
-
                 const coords = coordMapa[nombreEst] || { x: 50, y: 50 };
                 return `${coords.x * 15},${coords.y * 7}`;
               }).join(' ');
@@ -198,7 +187,8 @@ const nodosMapa = estacionesUnicas.map((nombre) => {
                 </g>
               );
             })}
-            {/* RENDERIZADO DE NODOS CLICKABLES */}
+
+            {/* NODOS */}
             {nodosMapa.map((nodo) => {
               const slugEstacion = nodo.nombre
                 .toLowerCase()
@@ -206,11 +196,9 @@ const nodosMapa = estacionesUnicas.map((nombre) => {
                 .replace(/[\s\-]+/g, '-')
                 .replace(/[^a-z0-9\-áéíóúñ]/g, '');
 
-              const urlEstacion = `/${linea}/${slugEstacion}`;
-
               return (
-                <g class="cursor-pointer group select-none" onclick={`window.location.href = '${urlEstacion}'`}>
-                  <circle cx={nodo.x} cy={nodo.y} r="14" fill="#10b981" class="opacity-0 group-hover:opacity-20 transition-all duration-200" />
+                <g class="cursor-pointer group select-none" onclick={`window.location.href = '/${linea}/${slugEstacion}'`}>
+                  <circle cx={nodo.x} cy={nodo.y} r="15" fill="#10b981" class="opacity-0 group-hover:opacity-20 transition-all duration-200" />
                   <circle cx={nodo.x} cy={nodo.y} r="8" fill="#020617" stroke={nodo.tieneSub ? "#f59e0b" : "#06b6d4"} stroke-width="3" class="group-hover:stroke-white transition-all duration-200" />
                   <circle cx={nodo.x} cy={nodo.y} r="3" fill={nodo.tieneSub ? "#f59e0b" : "#06b6d4"} />
                   
@@ -229,5 +217,7 @@ const nodosMapa = estacionesUnicas.map((nombre) => {
         </div>
       </div>
     </main>
+
+    <Footer />
   </body>
 </html>
