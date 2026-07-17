@@ -14,65 +14,130 @@ export function getStaticPaths() {
 const { linea } = Astro.params;
 const codigoLineaUpper = linea.toUpperCase();
 
+// 1. DICCIONARIO ÚNICO DE COORDENADAS POR ESTACIÓN
 const CONFIG_MAPAS: Record<string, Record<string, { x: number; y: number }>> = {
   "PE-17": {
-    "El Priorato": { x: 85, y: 15 }, "Lora del Río": { x: 78, y: 22 }, "Guadañoz": { x: 70, y: 30 },
-    "Los Rosales": { x: 62, y: 38 }, "Brenes": { x: 54, y: 46 }, "Majarabique": { x: 45, y: 55 },
-    "Triángulo Tamarguillo": { x: 45, y: 68 }, "La Negrilla": { x: 52, y: 78 }, "C.T.T. Sevilla": { x: 38, y: 72 },
-    "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja": { x: 30, y: 60 }, "Sevilla Santa Justa": { x: 35, y: 85 }
+    "El Priorato":                                    { x: 85, y: 10 },
+    "Lora del Río":                                   { x: 78, y: 16 },
+    "Guadañoz":                                       { x: 71, y: 22 },
+    "Los Rosales":                                    { x: 64, y: 28 },
+    "Brenes":                                         { x: 57, y: 34 },
+    "Majarabique":                                    { x: 50, y: 40 },
+    "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja": { x: 38, y: 52 }, // Ramal izquierdo muerto
+    "Triángulo Tamarguillo":                          { x: 50, y: 52 }, // Recto hacia abajo
+    "C.T.T. Sevilla":                                 { x: 44, y: 64 }, // Desvío inferior izquierdo
+    "Sevilla Santa Justa":                            { x: 38, y: 74 }, // Fin de Santa Justa
+    "La Negrilla":                                    { x: 58, y: 68 }  // Desvío inferior derecho
   },
   "PE-24": {
-    "Sevilla Santa Justa": { x: 50, y: 8 }, "La Salud": { x: 50, y: 16 }, "Dos Hermanas": { x: 50, y: 24 },
-    "Utrera": { x: 50, y: 32 }, "Las Alcantarillas": { x: 54, y: 38 }, "Las Cabezas": { x: 46, y: 44 },
-    "Lebrija": { x: 42, y: 52 }, "Aeropuerto de Jerez": { x: 38, y: 60 }, "Jerez-Mercancías": { x: 38, y: 66 },
-    "Jerez de la Frontera": { x: 34, y: 72 }, "El Puerto de Santa María": { x: 34, y: 80 }, "Las Aletas": { x: 34, y: 86 },
-    "Puerto Real": { x: 34, y: 92 }, "San Fernando-Bahía Sur": { x: 26, y: 92 }, "Cortadura": { x: 18, y: 84 }, "Cádiz": { x: 18, y: 74 }
+    "Sevilla Santa Justa":      { x: 50, y: 8 },    "La Salud":                 { x: 50, y: 16 },
+    "Dos Hermanas":             { x: 50, y: 24 },   "Utrera":                   { x: 50, y: 32 },
+    "Las Alcantarillas":        { x: 46, y: 38 },   "Las Cabezas":              { x: 42, y: 44 },
+    "Lebrija":                  { x: 38, y: 50 },   "Aeropuerto de Jerez":      { x: 34, y: 56 },
+    "Jerez-Mercancías":         { x: 30, y: 62 },   "Jerez de la Frontera":     { x: 26, y: 68 },
+    "El Puerto de Santa María": { x: 26, y: 76 },   "Las Aletas":               { x: 26, y: 82 },
+    "Puerto Real":              { x: 26, y: 88 },   "San Fernando-Bahía Sur":   { x: 18, y: 92 },
+    "Cortadura":                { x: 12, y: 84 },   "Cádiz":                    { x: 12, y: 74 }
   },
   "PE-26": {
-    "Majarabique": { x: 90, y: 30 }, "Alamillo": { x: 82, y: 35 }, "Apd. S. Jerónimo-Apd. Estadio-Apd. Cartuja": { x: 82, y: 45 },
-    "Valencina-Santiponce": { x: 74, y: 30 }, "Salteras": { x: 67, y: 35 }, "Villanueva-Olivares": { x: 60, y: 38 },
-    "Benacazón": { x: 53, y: 42 }, "Aznalcázar-Pilas": { x: 46, y: 45 }, "Huévar": { x: 40, y: 48 },
-    "Carrión de los Céspedes": { x: 34, y: 50 }, "Escacena": { x: 28, y: 52 }, "Villalba": { x: 23, y: 54 },
-    "La Palma del Condado": { x: 18, y: 56 }, "Niebla": { x: 14, y: 60 }, "San Juan del Puerto": { x: 10, y: 65 },
-    "Huelva Mercancías": { x: 8, y: 72 }, "Huelva": { x: 8, y: 82 }
+    "Majarabique":                                    { x: 92, y: 25 }, // Extremo derecho del tronco
+    "Alamillo":                                       { x: 84, y: 27 }, // Sigue la línea recta
+    "Apd. S. Jerónimo-Apd. Estadio-Apd. Cartuja":     { x: 88, y: 39 }, // Bifurcación hacia ABAJO
+    "Valencina-Santiponce":                           { x: 76, y: 29 }, // El tronco continúa recto
+    // Los demás se quedan igual para mantener la preciosa curva descendente a Huelva:
+    "Salteras":                                       { x: 69, y: 33 },
+    "Villanueva-Olivares":                            { x: 62, y: 36 },
+    "Benacazón":                                      { x: 55, y: 40 },
+    "Aznalcázar-Pilas":                               { x: 48, y: 44 },
+    "Huévar":                                         { x: 42, y: 47 },
+    "Carrión de los Céspedes":                        { x: 36, y: 49 },
+    "Escacena":                                       { x: 30, y: 51 },
+    "Villalba":                                       { x: 24, y: 53 },
+    "La Palma del Condado":                           { x: 19, y: 56 },
+    "Niebla":                                         { x: 14, y: 60 },
+    "San Juan del Puerto":                            { x: 10, y: 66 },
+    "Huelva Mercancías":                              { x: 8, y: 73 },
+    "Huelva":                                         { x: 8, y: 84 }
   }
 };
 
+// 2. DEFINICIÓN DE TRAMOS REALES DE VÍAS (Evita las uniones secuenciales erróneas)
+const TRAMOS_VIAS: Record<string, string[][]> = {
+  "pe-17": [
+    // Tronco principal de bajada
+    ["El Priorato", "Lora del Río", "Guadañoz", "Los Rosales", "Brenes", "Majarabique"],
+    // Bifurcación 1: De Majarabique al Apeadero
+    ["Majarabique", "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja"],
+    // Bifurcación 2: De Majarabique al Triángulo
+    ["Majarabique", "Triángulo Tamarguillo"],
+    // Salidas del Triángulo
+    ["Triángulo Tamarguillo", "C.T.T. Sevilla", "Sevilla Santa Justa"],
+    ["Triángulo Tamarguillo", "La Negrilla"]
+  ],
+  "pe-24": [
+    ["Sevilla Santa Justa", "La Salud", "Dos Hermanas", "Utrera", "Las Alcantarillas", "Las Cabezas", "Lebrija", "Aeropuerto de Jerez", "Jerez-Mercancías", "Jerez de la Frontera", "El Puerto de Santa María", "Las Aletas", "Puerto Real", "San Fernando-Bahía Sur", "Cortadura", "Cádiz"]
+  ],
+  "pe-26": [
+    // Tronco principal recto y continuo hacia Huelva
+    [
+      "Majarabique", "Alamillo", "Valencina-Santiponce", "Salteras", 
+      "Villanueva-Olivares", "Benacazón", "Aznalcázar-Pilas", "Huévar", 
+      "Carrión de los Céspedes", "Escacena", "Villalba", "La Palma del Condado", 
+      "Niebla", "San Juan del Puerto", "Huelva Mercancías", "Huelva"
+    ],
+    // Bifurcación: Ramal que cuelga hacia el sur desde el entorno de Alamillo / Majarabique
+    ["Alamillo", "Apd. S. Jerónimo-Apd. Estadio-Apd. Cartuja"]
+  ]
+};
+
+const coordMapa = CONFIG_MAPAS[codigoLineaUpper] || {};
+const tramosDeEstaLinea = TRAMOS_VIAS[linea] || [];
+
+// Obtener lista única de estaciones presentes para renderizar los nodos interactivos
+const estacionesUnicas = [...new Set(tramosDeEstaLinea.flat())];
+
+const limpiarParaMatch = (str: string) => {
+  return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+};
+
+// Escaneo básico de subestaciones fijas
 const docsDir = path.join(process.cwd(), 'public', 'docs', 'Consignas finales');
-let rawFiles: string[] = [];
+const subestacionesDetectadas = new Set<string>();
 
 if (fs.existsSync(docsDir)) {
   const allFiles = fs.readdirSync(docsDir, { recursive: true }) as string[];
-  rawFiles = allFiles.filter(file => 
-    file.replace(/\\/g, '/').toUpperCase().startsWith(codigoLineaUpper + '/') && file.endsWith('.pdf')
-  );
+  allFiles.forEach(file => {
+    const normPath = file.replace(/\\/g, '/');
+    if (normPath.toLowerCase().startsWith(linea.toLowerCase() + '/')) {
+      const fileName = normPath.split('/').pop() || '';
+      if (fileName.toLowerCase().includes('s.e.') || fileName.toLowerCase().includes('subestacion')) {
+        subestacionesDetectadas.add(limpiarParaMatch(fileName));
+      }
+    }
+  });
 }
 
-const estacionesAgrupadas: Record<string, { orden: number; x: number; y: number; tieneSub: boolean }> = {};
-const coordMapa = CONFIG_MAPAS[codigoLineaUpper] || {};
+// Mapeo final de nodos con su configuración visual escalar
+const nodosMapa = estacionesUnicas.map((nombre) => {
+  const coords = coordMapa[nombre] || { x: 50, y: 50 };
+  const tokenEstacion = limpiarParaMatch(nombre);
+  let tieneSub = false;
 
-rawFiles.forEach((filePath) => {
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  const fileName = normalizedPath.split('/').pop() || '';
-  const esSubestacion = fileName.toLowerCase().includes('s.e.') || fileName.toLowerCase().includes('subestacion');
-  const matchNumero = fileName.match(/^(\d+)_/);
-  const numeroOrden = matchNumero ? parseInt(matchNumero[1], 10) : 999;
+  subestacionesDetectadas.forEach(subToken => {
+    if (subToken.includes(tokenEstacion) || tokenEstacion.includes(subToken)) tieneSub = true;
+  });
 
-  let nombreEstacion = fileName.replace('.pdf', '').replace(/^\d+_/,'').replace(/subestacion/gi, '').replace(/subestación/gi, '').replace(/s\.e\./gi, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
-  if (!nombreEstacion) nombreEstacion = fileName.replace('.pdf', '').replace(/^\d+_/,'').trim();
-
-  const nombreClave = Object.keys(coordMapa).find(k => k.toLowerCase() === nombreEstacion.toLowerCase()) || nombreEstacion;
-  const coords = coordMapa[nombreClave] || { x: 50, y: 50 };
-
-  if (!estacionesAgrupadas[nombreClave]) {
-    estacionesAgrupadas[nombreClave] = { orden: numeroOrden, x: coords.x, y: coords.y, tieneSub: false };
+  if (["Dos Hermanas", "Lebrija", "Cortadura", "Lora del Río", "Sevilla Santa Justa"].includes(nombre)) {
+    tieneSub = true; 
   }
-  if (esSubestacion) estacionesAgrupadas[nombreClave].tieneSub = true;
-  if (numeroOrden < estacionesAgrupadas[nombreClave].orden) estacionesAgrupadas[nombreClave].orden = numeroOrden;
-});
 
-const nombresEstacionesOrdenadas = Object.keys(estacionesAgrupadas).sort((a, b) => estacionesAgrupadas[a].orden - estacionesAgrupadas[b].orden);
-const svgPoints = nombresEstacionesOrdenadas.map(name => `${estacionesAgrupadas[name].x * 15},${estacionesAgrupadas[name].y * 7}`).join(' ');
+  return {
+    nombre,
+    x: coords.x * 15,
+    y: coords.y * 7,
+    tieneSub
+  };
+});
 ---
 
 <html lang="es">
@@ -98,27 +163,46 @@ const svgPoints = nombresEstacionesOrdenadas.map(name => `${estacionesAgrupadas[
       <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl overflow-hidden">
         <div class="mb-4">
           <h2 class="text-xs font-bold uppercase text-slate-400 tracking-widest">Panel de Control General</h2>
-          <p class="text-[11px] text-slate-500 mt-0.5">Haz clic sobre cualquier estación en el mapa para acceder a su espacio de datos particular.</p>
+          <p class="text-[11px] text-slate-500 mt-0.5">Mapeo dinámico multi-ramal. Haz clic en un nodo para gestionar su documentación.</p>
         </div>
 
         <div class="w-full overflow-auto flex justify-center py-6">
           <svg class="w-[1500px] h-[750px] bg-slate-950/40 rounded-2xl border border-slate-800/80" viewBox="0 0 1500 750">
-            <polyline points={svgPoints} fill="none" stroke="#334155" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
-            <polyline points={svgPoints} fill="none" stroke="url(#railGradient)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            
             <defs>
               <linearGradient id="railGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#10b981" /><stop offset="50%" stop-color="#06b6d4" /><stop offset="100%" stop-color="#f59e0b" />
               </linearGradient>
             </defs>
 
-            {nombresEstacionesOrdenadas.map((nombre) => {
-              const info = estacionesAgrupadas[nombre];
-              const posX = info.x * 15;
-              const posY = info.y * 7;
-              
-              // Lógica de generación de slug idéntica a [estacion].astro para evitar variaciones de guiones
-              const slugEstacion = nombre
+           {/* PINTADO DE TRAMOS DE VÍA INDEPENDIENTES */}
+            {tramosDeEstaLinea.map((tramo) => {
+              const pointsStr = tramo.map((nombreEst, idx) => {
+                // Caso especial PE-26: El ramal al apeadero nace a mitad de camino entre Majarabique y Alamillo
+                if (linea === "pe-26" && tramo.includes("Apd. S. Jerónimo-Apd. Estadio-Apd. Cartuja") && idx === 0) {
+                  const m = coordMapa["Majarabique"] || { x: 92, y: 25 };
+                  const a = coordMapa["Alamillo"] || { x: 84, y: 27 };
+                  const midX = (m.x + a.x) / 2;
+                  const midY = (m.y + a.y) / 2;
+                  return `${midX * 15},${midY * 7}`;
+                }
+
+                const coords = coordMapa[nombreEst] || { x: 50, y: 50 };
+                return `${coords.x * 15},${coords.y * 7}`;
+              }).join(' ');
+
+              return (
+                <g>
+                  <polyline points={pointsStr} fill="none" stroke="#334155" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+                  <polyline points={pointsStr} fill="none" stroke="url(#railGradient)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                </g>
+              );
+            })}
+            {/* RENDERIZADO DE NODOS CLICKABLES */}
+            {nodosMapa.map((nodo) => {
+              const slugEstacion = nodo.nombre
                 .toLowerCase()
+                .replace(/\./g, '')
                 .replace(/[\s\-]+/g, '-')
                 .replace(/[^a-z0-9\-áéíóúñ]/g, '');
 
@@ -126,10 +210,18 @@ const svgPoints = nombresEstacionesOrdenadas.map(name => `${estacionesAgrupadas[
 
               return (
                 <g class="cursor-pointer group select-none" onclick={`window.location.href = '${urlEstacion}'`}>
-                  <circle cx={posX} cy={posY} r="14" fill="#10b981" class="opacity-0 group-hover:opacity-20 transition-all duration-200" />
-                  <circle cx={posX} cy={posY} r="8" fill="#020617" stroke={info.tieneSub ? "#f59e0b" : "#06b6d4"} stroke-width="3" class="group-hover:stroke-white transition-all duration-200" />
-                  <circle cx={posX} cy={posY} r="3" fill={info.tieneSub ? "#f59e0b" : "#06b6d4"} />
-                  <text x={posX} y={posY - 14} text-anchor="middle" class="fill-slate-400 font-sans font-bold text-[11px] group-hover:fill-white transition-colors duration-150">{nombre}</text>
+                  <circle cx={nodo.x} cy={nodo.y} r="14" fill="#10b981" class="opacity-0 group-hover:opacity-20 transition-all duration-200" />
+                  <circle cx={nodo.x} cy={nodo.y} r="8" fill="#020617" stroke={nodo.tieneSub ? "#f59e0b" : "#06b6d4"} stroke-width="3" class="group-hover:stroke-white transition-all duration-200" />
+                  <circle cx={nodo.x} cy={nodo.y} r="3" fill={nodo.tieneSub ? "#f59e0b" : "#06b6d4"} />
+                  
+                  <text 
+                    x={nodo.x + 14} 
+                    y={nodo.y + 4} 
+                    text-anchor="start" 
+                    class="fill-slate-400 font-sans font-bold text-[10px] group-hover:fill-white transition-colors duration-150"
+                  >
+                    {nodo.nombre}
+                  </text>
                 </g>
               );
             })}
