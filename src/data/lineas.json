@@ -1,0 +1,75 @@
+[
+  {
+    "id": "pe-17",
+    "codigo": "P.E. 17",
+    "nombre": "Línea Madrid - Sevilla (El Priorato a Sevilla S.J.)",
+    "color": "#008A4A",
+    "hojas": [
+      { "num": 1, "nombre": "El Priorato", "archivo": "pe-17/hoja01_el_priorato.pdf" },
+      { "num": 2, "nombre": "Lora del Río", "archivo": "pe-17/hoja02_lora_del_rio.pdf" },
+      { "num": 3, "nombre": "Guadañoz", "archivo": "pe-17/hoja03_guadanoz.pdf" },
+      { "num": 4, "nombre": "Los Rosales", "archivo": "pe-17/hoja04_los_rosales.pdf" },
+      { "num": 5, "nombre": "Brenes", "archivo": "pe-17/hoja05_brenes.pdf" },
+      { "num": 6, "nombre": "Majarabique", "archivo": "pe-17/hoja06_majarabique.pdf" },
+      { "num": 7, "nombre": "Triángulo Tamarguillo", "archivo": "pe-17/hoja07_triangulo_tamarguillo.pdf" },
+      { "num": 8, "nombre": "La Negrilla", "archivo": "pe-17/hoja08_la_negrilla.pdf" },
+      { "num": 9, "nombre": "C.T.T. Sevilla", "archivo": "pe-17/hoja09_ctt_sevilla.pdf" },
+      { "num": 10, "nombre": "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja", "archivo": "pe-17/hoja10_ramal_cartuja.pdf" },
+      { "num": 11, "nombre": "Sevilla Santa Justa", "archivo": "pe-17/hoja11_sevilla_sj.pdf" }
+    ]
+  },
+  {
+    "id": "pe-24",
+    "codigo": "P.E. 24",
+    "nombre": "Línea Sevilla a Cádiz",
+    "color": "#006F33",
+    "hojas": [
+      { "num": 1, "nombre": "Sevilla Santa Justa", "archivo": "pe-24/hoja01_sevilla_sj.pdf" },
+      { "num": 2, "nombre": "La Salud", "archivo": "pe-24/hoja02_la_salud.pdf" },
+      { "num": 3, "nombre": "Dos Hermanas", "archivo": "pe-24/hoja03_dos_hermanas.pdf" },
+      { "num": 4, "nombre": "Dos Hermanas S/E.", "archivo": "pe-24/hoja04_dos_hermanas_se.pdf" },
+      { "num": 5, "nombre": "Utrera", "archivo": "pe-24/hoja05_utrera.pdf" },
+      { "num": 6, "nombre": "Las Alcantarillas S/E.", "archivo": "pe-24/hoja06_las_alcantarillas_se.pdf" },
+      { "num": 7, "nombre": "Las Cabezas", "archivo": "pe-24/hoja07_las_cabezas.pdf" },
+      { "num": 8, "nombre": "Lebrija S/E.", "archivo": "pe-24/hoja08_lebrija_se.pdf" },
+      { "num": 9, "nombre": "Lebrija", "archivo": "pe-24/hoja09_lebrija.pdf" },
+      { "num": 10, "nombre": "El Cuervo S/E.", "archivo": "pe-24/hoja10_el_cuervo_se.pdf" },
+      { "num": 11, "nombre": "Aeropuerto de Jerez", "archivo": "pe-24/hoja11_aeropuerto_jerez.pdf" },
+      { "num": 12, "nombre": "Jerez-Mercancías", "archivo": "pe-24/hoja12_jerez_mercancias.pdf" },
+      { "num": 13, "nombre": "Jerez de la Frontera", "archivo": "pe-24/hoja13_jerez_frontera.pdf" },
+      { "num": 14, "nombre": "El Portal S/E.", "archivo": "pe-24/hoja14_el_portal_se.pdf" },
+      { "num": 15, "nombre": "El Puerto de Santa María", "archivo": "pe-24/hoja15_el_puerto.pdf" },
+      { "num": 16, "nombre": "Las Aletas", "archivo": "pe-24/hoja16_las_aletas.pdf" },
+      { "num": 17, "nombre": "Puerto Real", "archivo": "pe-24/hoja17_puerto_real.pdf" },
+      { "num": 18, "nombre": "San Fernando-Bahía Sur", "archivo": "pe-24/hoja18_san_fernando.pdf" },
+      { "num": 19, "nombre": "Torregorda S/E.", "archivo": "pe-24/hoja19_torregorda_se.pdf" },
+      { "num": 20, "nombre": "Cortadura", "archivo": "pe-24/hoja20_cortadura.pdf" },
+      { "num": 21, "nombre": "Cádiz", "archivo": "pe-24/hoja21_cadiz.pdf" }
+    ]
+  },
+  {
+    "id": "pe-26",
+    "codigo": "P.E. 26",
+    "nombre": "Línea de Bif. Los Naranjos a Huelva",
+    "color": "#1F5133",
+    "hojas": [
+      { "num": 1, "nombre": "Majarabique", "archivo": "pe-26/hoja01_majarabique.pdf" },
+      { "num": 2, "nombre": "Apd. S. Jerónimo - Apd. Estadio - Apd. Cartuja", "archivo": "pe-26/hoja02_ramal_cartuja.pdf" },
+      { "num": 3, "nombre": "Alamillo", "archivo": "pe-26/hoja03_alamillo.pdf" },
+      { "num": 4, "nombre": "Valencina-Santiponce", "archivo": "pe-26/hoja04_valencina.pdf" },
+      { "num": 5, "nombre": "Salteras", "archivo": "pe-26/hoja05_salteras.pdf" },
+      { "num": 6, "nombre": "Villanueva-Olivares", "archivo": "pe-26/hoja06_villanueva_olivares.pdf" },
+      { "num": 7, "nombre": "Benacazón", "archivo": "pe-26/hoja07_benacazon.pdf" },
+      { "num": 8, "nombre": "Aznalcázar-Pilas", "archivo": "pe-26/hoja08_aznalcazar_pilas.pdf" },
+      { "num": 9, "nombre": "Huévar", "archivo": "pe-26/hoja09_huevar.pdf" },
+      { "num": 10, "nombre": "Carrión de los Céspedes", "archivo": "pe-26/hoja10_carrion.pdf" },
+      { "num": 11, "nombre": "Escacena", "archivo": "pe-26/hoja11_escacena.pdf" },
+      { "num": 12, "nombre": "Villalba", "archivo": "pe-26/hoja12_villalba.pdf" },
+      { "num": 13, "nombre": "La Palma del Condado", "archivo": "pe-26/hoja13_la_palma.pdf" },
+      { "num": 14, "nombre": "Niebla", "archivo": "pe-26/hoja14_niebla.pdf" },
+      { "num": 15, "nombre": "San Juan del Puerto", "archivo": "pe-26/hoja15_san_juan.pdf" },
+      { "num": 16, "nombre": "Huelva Mercancías", "archivo": "pe-26/hoja16_huelva_mercancias.pdf" },
+      { "num": 17, "nombre": "Huelva", "archivo": "pe-26/hoja17_huelva.pdf" }
+    ]
+  }
+]
