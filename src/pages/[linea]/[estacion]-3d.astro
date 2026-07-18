@@ -1,5 +1,9 @@
 ---
 // src/pages/[linea]/[estacion]-3d.astro
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
+import "../../styles/global.css";
+
 import { CONFIG_MAPAS, TRAMOS_VIAS } from "../../data/geo-infraestructura.js";
 
 export function getStaticPaths() {
@@ -11,7 +15,6 @@ export function getStaticPaths() {
     const estacionesUnicas = [...new Set(tramosDeEstaLinea.flat())];
 
     estacionesUnicas.forEach((nombre) => {
-      // Generamos exactamente el mismo slug que usas en el mapa principal
       const slugEstacion = nombre
         .toLowerCase()
         .replace(/\./g, "")
@@ -33,9 +36,231 @@ export function getStaticPaths() {
   return paths;
 }
 
-// Aquí recuperas los parámetros para usarlos en tu interfaz 3D de la estación
 const { linea, estacion } = Astro.params;
 const { nombreReal } = Astro.props;
 ---
 
-<!-- El resto de tu HTML/Canvas/Script para la vista de la estación va aquí abajo -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GDT - {nombreReal} (Vista 3D)</title>
+</head>
+<body class="bg-slate-950 text-slate-100 m-0 p-0 overflow-hidden select-none font-sans">
+
+  <!-- Tu Header global adaptado -->
+  <Header />
+
+  <div class="relative w-full h-[calc(100vh-64px)] bg-slate-950 overflow-hidden">
+    
+    <!-- INTERFAZ FLOTANTE: CONTROLES Y VOLVER -->
+    <div class="absolute top-0 left-0 w-full z-30 p-6 bg-gradient-to-b from-slate-950 via-slate-950/80 to-transparent flex justify-between items-center pointer-events-none">
+      <div class="pointer-events-auto">
+        <a 
+          href={`/${linea}/mapa-3d`} 
+          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-400 hover:text-white hover:border-slate-600 transition-all shadow-xl"
+        >
+          ← Volver al Mapa General
+        </a>
+        <h1 class="text-xl font-bold text-slate-100 tracking-tight mt-3 flex items-center gap-3">
+          <span>{nombreReal}</span>
+          <span class="text-xs font-mono px-2 py-0.5 rounded border border-cyan-500/30 text-cyan-400 bg-cyan-950/40">
+            GEMELO DIGITAL 3D
+          </span>
+        </h1>
+      </div>
+
+      <!-- PANEL LATERAL DE DOCUMENTACIÓN ASOCIADA -->
+      <div class="pointer-events-auto w-80 bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 shadow-2xl backdrop-blur-md hidden md:block">
+        <h3 class="text-xs font-bold uppercase text-slate-400 tracking-wider border-b border-slate-800 pb-2 mb-3">
+          Expediente Técnico del Nodo
+        </h3>
+        <div class="space-y-2 text-xs">
+          <div class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 hover:border-amber-500/40 transition-colors cursor-pointer group" id="btn-consigna-elec">
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-medium text-slate-200 group-hover:text-amber-400 transition-colors">Consigna de Electrificación</span>
+              <span class="text-[10px] px-1.5 py-0.2 bg-amber-500/10 text-amber-400 rounded font-mono">C-ELE-04</span>
+            </div>
+            <p class="text-slate-500 text-[11px]">Enlace y esquemas de seccionadores de catenaria.</p>
+          </div>
+          
+          <div class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 hover:border-cyan-500/40 transition-colors cursor-pointer group" id="btn-consigna-a">
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-medium text-slate-200 group-hover:text-cyan-400 transition-colors">Consigna A</span>
+              <span class="text-[10px] px-1.5 py-0.2 bg-cyan-500/10 text-cyan-400 rounded font-mono">REG-A</span>
+            </div>
+            <p class="text-slate-500 text-[11px]">Normativa de bloqueo y seguridad en andenes.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTENEDOR 3D PRINCIPAL -->
+    <div id="canvas-estacion" class="w-full h-full absolute inset-0 z-10"></div>
+
+    <!-- CAPA SVG PARA LAS LÍNEAS TÉCNICAS (LEADER LINES) -->
+    <svg id="svg-guias" class="absolute inset-0 w-full h-full pointer-events-none z-20">
+      <!-- Las líneas poligonales se inyectan dinámicamente desde el script -->
+    </svg>
+
+    <!-- CAPA DE TARJETAS FLOTANTES HTML -->
+    <div id="html-labels" class="absolute inset-0 w-full h-full pointer-events-none z-20">
+      
+      <!-- Cartel 1: Consigna de Electrificación -->
+      <div id="tag-consigna-elec" class="absolute pointer-events-auto bg-slate-900/95 border border-amber-500/40 p-3 rounded-xl shadow-2xl w-56 text-xs hidden backdrop-blur-sm">
+        <div class="font-bold text-amber-400 mb-1 flex items-center gap-1.5">⚡ Consigna Electrificación</div>
+        <p class="text-slate-400 text-[11px] mb-2">Punto de acometida y feeders de tracción.</p>
+        <a href="#" class="inline-block text-center w-full bg-slate-800 hover:bg-amber-600 text-white rounded p-1 transition-colors font-medium">Abrir Documento PDF</a>
+      </div>
+
+      <!-- Cartel 2: Consigna A -->
+      <div id="tag-consigna-a" class="absolute pointer-events-auto bg-slate-900/95 border border-cyan-500/40 p-3 rounded-xl shadow-2xl w-56 text-xs hidden backdrop-blur-sm">
+        <div class="font-bold text-cyan-400 mb-1 flex items-center gap-1.5">🏢 Consigna A (Estación)</div>
+        <p class="text-slate-400 text-[11px] mb-2">Gálibos de andén y cableado de señales.</p>
+        <a href="#" class="inline-block text-center w-full bg-slate-800 hover:bg-cyan-600 text-white rounded p-1 transition-colors font-medium">Ver Planos Adjuntos</a>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>
+
+<!-- SCRIPT COMPORTAMENTAL DE TERCEROS COMPILADO EN CLIENTE -->
+<script>
+  import * as THREE from "three";
+  import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+
+  const container = document.getElementById("canvas-estacion");
+  
+  if (container) {
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x020617);
+    scene.fog = new THREE.FogExp2(0x020617, 0.003);
+
+    const persCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+    persCamera.position.set(60, 40, 80);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(persCamera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI / 2 - 0.05;
+
+    // Luces
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(40, 60, 20);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+
+    // Malla base
+    const gridHelper = new THREE.GridHelper(200, 50, 0x1e293b, 0x0f172a);
+    gridHelper.position.y = -0.01;
+    scene.add(gridHelper);
+
+    // Maqueta base estación
+    const edificioGroup = new THREE.Group();
+    const cuerpoGeo = new THREE.BoxGeometry(30, 12, 14);
+    const cuerpoMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+    const cuerpoMesh = new THREE.Mesh(cuerpoGeo, cuerpoMat);
+    cuerpoMesh.position.y = 6;
+    cuerpoMesh.castShadow = true;
+    cuerpoMesh.receiveShadow = true;
+    edificioGroup.add(cuerpoMesh);
+
+    const tejadoGeo = new THREE.ConeGeometry(12, 6, 4);
+    const tejadoMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+    const tejadoMesh = new THREE.Mesh(tejadoGeo, tejadoMat);
+    tejadoMesh.position.set(0, 15, 0);
+    tejadoMesh.rotation.y = Math.PI / 4;
+    tejadoMesh.castShadow = true;
+    edificioGroup.add(tejadoMesh);
+    
+    scene.add(edificioGroup);
+
+    // Anclajes 3D para el dibujo de líneas
+    const puntoAnclajeTejado = new THREE.Vector3(0, 15, 0);
+    const puntoAnclajeLateral = new THREE.Vector3(12, 4, 7);
+
+    const svgOverlay = document.getElementById("svg-guias");
+    const tagElec = document.getElementById("tag-consigna-elec");
+    const tagConsignaA = document.getElementById("tag-consigna-a");
+
+    function proyectarLineasYEtiquetas() {
+      if (!svgOverlay || !tagElec || !tagConsignaA) return;
+
+      let htmlContenidoSVG = "";
+
+      const configuraciones = [
+        {
+          punto3D: puntoAnclajeTejado,
+          tagHTML: tagElec,
+          offsetX: 160,
+          offsetY: -100,
+          color: "#f59e0b"
+        },
+        {
+          punto3D: puntoAnclajeLateral,
+          tagHTML: tagConsignaA,
+          offsetX: -240,
+          offsetY: -40,
+          color: "#06b6d4"
+        }
+      ];
+
+      configuraciones.forEach((cfg) => {
+        const wp = cfg.punto3D.clone();
+        wp.project(persCamera);
+
+        if (wp.z > 1) {
+          cfg.tagHTML.style.display = "none";
+          return;
+        }
+
+        const x = (wp.x * 0.5 + 0.5) * container.clientWidth;
+        const y = (-(wp.y * 0.5) + 0.5) * container.clientHeight;
+
+        cfg.tagHTML.style.display = "block";
+        cfg.tagHTML.style.left = `${x + cfg.offsetX}px`;
+        cfg.tagHTML.style.top = `${y + cfg.offsetY}px`;
+
+        const xCartelAnclaje = x + cfg.offsetX + (cfg.offsetX > 0 ? 0 : 224);
+        const yCartelAnclaje = y + cfg.offsetY + 20;
+
+        htmlContenidoSVG += `
+          <polyline 
+            points="${x},${y} ${xCartelAnclaje - (cfg.offsetX > 0 ? 30 : -30)},${yCartelAnclaje} ${xCartelAnclaje},${yCartelAnclaje}" 
+            style="fill:none; stroke:${cfg.color}; stroke-width:1.5; stroke-dasharray: 4 3;"
+          />
+          <circle cx="${x}" cy="${y}" r="3.5" style="fill:${cfg.color}; stroke:#020617; stroke-width:1;" />
+        `;
+      });
+
+      svgOverlay.innerHTML = htmlContenidoSVG;
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      proyectarLineasYEtiquetas();
+      renderer.render(scene, persCamera);
+    }
+
+    animate();
+
+    window.addEventListener("resize", () => {
+      persCamera.aspect = container.clientWidth / container.clientHeight;
+      persCamera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+  }
+</script>

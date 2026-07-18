@@ -190,7 +190,7 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
             class="nodo-lista-item p-2 bg-slate-950/40 border border-slate-900 rounded-lg flex justify-between items-center group hover:border-slate-700 hover:bg-slate-900/60 transition-all cursor-pointer"
           >
             <a
-              href={`/${linea}/${n.slug}`}
+              href={`/${linea}/${n.slug}-3d`}
               class="font-medium text-slate-200 group-hover:text-cyan-400 transition-colors"
               onClick="event.preventDefault();" /* Evita que recargue la página inmediatamente para permitir la animación 3D */
             >
@@ -867,29 +867,30 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
       tooltip!.style.top = `${event.clientY - rect.top + 15}px`;
     }
 
-    function onDocumentClick(event: MouseEvent) {
-      const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+ function onDocumentClick(event: MouseEvent) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-      raycaster.setFromCamera(mouse, camera);
-      const intersections = raycaster.intersectObjects(
-        objetosInteractivos,
-        true,
-      );
+  raycaster.setFromCamera(mouse, camera);
+  const intersections = raycaster.intersectObjects(
+    objetosInteractivos,
+    true,
+  );
 
-      if (intersections.length > 0) {
-        let rootGroup = intersections[0].object;
-        while (rootGroup.parent && rootGroup.parent !== scene) {
-          rootGroup = rootGroup.parent;
-        }
-
-        const datos = mapaDatosObjeto.get(rootGroup.id);
-        if (datos && datos.slug) {
-          window.location.href = `/${lineaCod}/${datos.slug}`;
-        }
-      }
+  if (intersections.length > 0) {
+    let rootGroup = intersections[0].object;
+    while (rootGroup.parent && rootGroup.parent !== scene) {
+      rootGroup = rootGroup.parent;
     }
+
+    const datos = mapaDatosObjeto.get(rootGroup.id);
+    if (datos && datos.slug) {
+      // CAMBIO AQUÍ: Añadimos "-3d" para que apunte a la nueva página técnica
+      window.location.href = `/${lineaCod}/${datos.slug}-3d`;
+    }
+  }
+}
 
     container.addEventListener("mousemove", onMouseMove);
     container.addEventListener("click", onDocumentClick);
