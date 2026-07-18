@@ -898,6 +898,8 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
     container.addEventListener("mousemove", onMouseMove);
     container.addEventListener("click", onDocumentClick);
 
+let idAnimacionCamara: number | null = null;
+
     // =========================================================================
     // INTERCONEXIÓN INTERACTIVA DESDE EL PANEL IZQUIERDO AL LIENZO 3D
     // =========================================================================
@@ -905,7 +907,6 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
     
     itemsLista.forEach((item) => {
       const slug = item.getAttribute("data-slug");
-      
       // Buscamos el objeto 3D que se corresponde con este slug analizando el mapa de datos
       let objeto3DAsociado: THREE.Object3D | null = null;
       let datosAsociados: any = null;
@@ -945,45 +946,55 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
         }
       });
 
-// B. Al hacer clic en la lista -> Desplazamos la cámara y clavamos el centro con un solo clic
+// B. Al hacer clic en la lista -> Desplazamos la cámara de forma segura
       item.addEventListener("click", () => {
         if (!objeto3DAsociado) return;
         
-        const posDestino = objeto3DAsociado.position;
+        // ¡LA CLAVE! Si ya había una animación ejecutándose, la destruimos por completo
+        if (idAnimacionCamara !== null) {
+          cancelAnimationFrame(idAnimacionCamara);
+        }
 
-        // Definimos el punto exacto al que debe mirar el pivote de rotación
+        const posDestino = objeto3DAsociado.position;
         const targetCamara = new THREE.Vector3(posDestino.x, posDestino.y, posDestino.z);
-        
-        // Ajustamos la posición final ideal de la cámara aérea
         const offsetCamara = new THREE.Vector3(
           posDestino.x, 
           posDestino.y + 45, 
           posDestino.z + 75  
         );
 
-        function interpolarCamara() {
-          // Calculamos la distancia que le falta a la cámara y al foco para llegar a su destino
-          const distCamara = camera.position.distanceTo(offsetCamara);
-          const distTarget = controls.target.distanceTo(targetCamara);
+        const inicioCamara = camera.position.clone();
+        const inicioTarget = controls.target.clone();
 
-          // Si todavía falta más de una fracción de milímetro, seguimos interpolando
-          if (distCamara > 0.01 || distTarget > 0.01) {
-            // Lerp asíncrono basado en la posición actual de cada frame
-            camera.position.lerp(offsetCamara, 0.1);
-            controls.target.lerp(targetCamara, 0.1);
-            
-            controls.update(); 
-            requestAnimationFrame(interpolarCamara);
+        const tiempoInicio = performance.now();
+        const duracion = 500; // Duración exacta de 0.5 segundos
+
+        function interpolarCamara() {
+          const tiempoActual = performance.now();
+          let progreso = (tiempoActual - tiempoInicio) / duracion;
+
+          if (progreso > 1) progreso = 1;
+
+          const progresoSuave = 1 - Math.pow(1 - progreso, 3); // Easing out
+
+          camera.position.lerpVectors(inicioCamara, offsetCamara, progresoSuave);
+          controls.target.lerpVectors(inicioTarget, targetCamara, progresoSuave);
+          
+          controls.update(); 
+
+          if (progreso < 1) {
+            // Guardamos el ID del frame actual para poder cancelarlo si el usuario vuelve a clicar
+            idAnimacionCamara = requestAnimationFrame(interpolarCamara);
           } else {
-            // Por seguridad, cuando ya está absurdamente cerca, forzamos los valores exactos
             camera.position.copy(offsetCamara);
             controls.target.copy(targetCamara);
             controls.update();
+            idAnimacionCamara = null; // Animación terminada con éxito, limpiamos el ID
           }
         }
         
-        // Arrancamos la aproximación continua
-        interpolarCamara();
+        // Arrancamos la animación
+        idAnimacionCamara = requestAnimationFrame(interpolarCamara);
       });
     });
     // =========================================================================
