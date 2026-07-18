@@ -111,10 +111,45 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <!-- Añadimos el query string para romper la caché agresiva en esta subruta -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Maqueta Volumétrica 3D - {codigoLineaUpper}</title>
+
+    <!-- Hacemos visibles las etiquetas inyectadas por el script sobre el canvas -->
+    <style is:global>
+      .estacion-label {
+        position: absolute;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-size: 10px;
+        font-weight: 700;
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        border-width: 1px;
+        user-select: none;
+        box-shadow:
+          0 4px 6px -1px rgb(0 0 0 / 0.1),
+          0 2px 4px -2px rgb(0 0 0 / 0.1);
+        backdrop-filter: blur(4px);
+        transition: opacity 200ms ease-in-out;
+        z-index: 10;
+        transform-origin: top left;
+        white-space: nowrap;
+      }
+      .label-subestacion {
+        background-color: rgb(69 26 3 / 0.85); /* bg-amber-950/85 */
+        color: rgb(251 191 36); /* text-amber-400 */
+        border-color: rgb(245 158 11 / 0.4); /* border-amber-500/40 */
+      }
+      .label-estacion {
+        background-color: rgb(15 23 42 / 0.85); /* bg-slate-900/85 */
+        color: rgb(34 211 238); /* text-cyan-400 */
+        border-color: rgb(6 182 212 / 0.4); /* border-cyan-500/40 */
+      }
+    </style>
   </head>
   <body class="bg-slate-950 min-h-screen flex flex-col antialiased text-white">
     <Header lineaActiva={linea} />
@@ -138,53 +173,40 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
       <div
         class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-stretch min-h-0"
       >
-        <!-- PANEL IZQUIERDO: SECCIÓN DE DATOS DE RED -->
-        <div class="lg:col-span-4 flex flex-col gap-4">
-          <div
-            class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl"
-          >
-            <h2
-              class="text-xs font-bold uppercase text-amber-500 tracking-widest mb-1"
-            >
-              Control de Navegación
-            </h2>
-            <p class="text-xs text-slate-400 leading-relaxed">
-              Pasa el ratón por encima de cualquier estructura en el lienzo 3D
-              para iluminarla. **Haz clic izquierdo directo** sobre la estación
-              u obra civil para abrir instantáneamente sus planos técnicos de
-              electrificación.
-            </p>
-          </div>
+<!-- PANEL IZQUIERDO: SECCIÓN DE DATOS DE RED -->
+<div class="lg:col-span-4 flex flex-col gap-4">
+  <!-- ... El contenedor de Control de Navegación se queda igual ... -->
 
-          <div
-            class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 overflow-y-auto max-h-[400px] lg:max-h-none"
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 overflow-y-auto max-h-[400px] lg:max-h-none">
+    <h3 class="text-xs font-bold uppercase text-slate-400 tracking-widest border-b border-slate-800 pb-2 mb-3">
+      Nodos Identificados ({nodosEstructurados.length})
+    </h3>
+    <ul class="space-y-1 text-xs text-slate-400">
+      {
+        nodosEstructurados.map((n) => (
+          /* Añadimos data-slug y la clase identificadora para capturarla en el script */
+          <li 
+            data-slug={n.slug}
+            class="nodo-lista-item p-2 bg-slate-950/40 border border-slate-900 rounded-lg flex justify-between items-center group hover:border-slate-700 hover:bg-slate-900/60 transition-all cursor-pointer"
           >
-            <h3
-              class="text-xs font-bold uppercase text-slate-400 tracking-widest border-b border-slate-800 pb-2 mb-3"
+            <a
+              href={`/${linea}/${n.slug}`}
+              class="font-medium text-slate-200 group-hover:text-cyan-400 transition-colors"
+              onClick="event.preventDefault();" /* Evita que recargue la página inmediatamente para permitir la animación 3D */
             >
-              Nodos Identificados ({nodosEstructurados.length})
-            </h3>
-            <ul class="space-y-1 text-xs text-slate-400">
-              {
-                nodosEstructurados.map((n) => (
-                  <li class="p-2 bg-slate-950/40 border border-slate-900 rounded-lg flex justify-between items-center group hover:border-slate-700 transition-colors">
-                    <a
-                      href={`/${linea}/${n.slug}`}
-                      class="font-medium text-slate-200 group-hover:text-cyan-400 transition-colors"
-                    >
-                      {n.nombre}
-                    </a>
-                    <span
-                      class={`text-[10px] font-mono px-2 py-0.5 rounded border ${n.tieneSub ? "text-amber-400 bg-amber-950/50 border-amber-900" : "text-cyan-400 bg-cyan-950/50 border-cyan-900"}`}
-                    >
-                      {n.tieneSub ? "S/E" : "ESTACIÓN"}
-                    </span>
-                  </li>
-                ))
-              }
-            </ul>
-          </div>
-        </div>
+              {n.nombre}
+            </a>
+            <span
+              class={`text-[10px] font-mono px-2 py-0.5 rounded border ${n.tieneSub ? "text-amber-400 bg-amber-950/50 border-amber-900" : "text-cyan-400 bg-cyan-950/50 border-cyan-900"}`}
+            >
+              {n.tieneSub ? "S/E" : "ESTACIÓN"}
+            </span>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</div>
 
         <!-- PANEL DERECHO: INTERFAZ WEBGL CANVAS -->
         <div
@@ -299,6 +321,12 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
 
     // Array global necesario para alimentar y amoldar el terreno en base a las coordenadas de la vía
     const todosLosPuntosDeVias: THREE.Vector3[] = [];
+
+    // Array para almacenar las referencias de las etiquetas fijas y sus coordenadas 3D
+    const referenciasEtiquetas: Array<{
+      element: HTMLElement;
+      pos3D: THREE.Vector3;
+    }> = [];
 
     // 1. GENERADOR DE VÍAS FERROVIARIAS (Y OBTENCIÓN DE DIODOS METRICOS)
     tramos.forEach((tram) => {
@@ -449,6 +477,7 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
         todosLosPuntosDeVias.push(...puntosCentro);
       }
     });
+
     // 2. MODULACIÓN E INSTANCIACIÓN DE GRANDES EDIFICIOS DE VIAJEROS (ESTILO ADIF REALISTA)
     nodos.forEach((nodo: any) => {
       const posX = (nodo.x - centroX) * escala;
@@ -595,6 +624,26 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
       estacionVisual.rotation.y = Math.atan2(posX, posZ) * 0.1;
 
       scene.add(estacionVisual);
+
+      // Inyección controlada de la etiqueta HTML en el contenedor padre
+     // Inyección controlada de la etiqueta HTML en el contenedor padre
+      const lbl = document.createElement("div");
+      
+      // Asignamos la clase base y la específica según el tipo de infraestructura
+      if (nodo.tieneSub) {
+        lbl.className = "estacion-label label-subestacion";
+        lbl.innerText = `⚡ ${nodo.nombre}`;
+      } else {
+        lbl.className = "estacion-label label-estacion";
+        lbl.innerText = `🚉 ${nodo.nombre}`;
+      }
+      container.appendChild(lbl);
+
+      // Almacenamos el div junto con sus coordenadas 3D para la fase de proyección
+      referenciasEtiquetas.push({
+        element: lbl,
+        pos3D: new THREE.Vector3(posX, alturaTerrenoY + 16, posZ),
+      });
 
       // Mapeamos los datos para el Raycaster original usando la marquesina de color como objetivo de hover
       mapaDatosObjeto.set(estacionVisual.id, {
@@ -845,9 +894,134 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
     container.addEventListener("mousemove", onMouseMove);
     container.addEventListener("click", onDocumentClick);
 
+// ... (Código existente de tus event listeners mousemove y click de Three.js)
+    container.addEventListener("mousemove", onMouseMove);
+    container.addEventListener("click", onDocumentClick);
+
+    // =========================================================================
+    // INTERCONEXIÓN INTERACTIVA DESDE EL PANEL IZQUIERDO AL LIENZO 3D
+    // =========================================================================
+    const itemsLista = document.querySelectorAll(".nodo-lista-item");
+    
+    itemsLista.forEach((item) => {
+      const slug = item.getAttribute("data-slug");
+      
+      // Buscamos el objeto 3D que se corresponde con este slug analizando el mapa de datos
+      let objeto3DAsociado: THREE.Object3D | null = null;
+      let datosAsociados: any = null;
+      
+      for (const [id, datos] of mapaDatosObjeto.entries()) {
+        if (datos.slug === slug) {
+          objeto3DAsociado = scene.getObjectById(id) || null;
+          datosAsociados = datos;
+          break;
+        }
+      }
+
+      if (!objeto3DAsociado || !datosAsociados) return;
+
+      // A. Al pasar el cursor por encima del elemento de la lista -> Iluminamos en el mapa 3D
+      item.addEventListener("mouseenter", () => {
+        if (objetoInterseccionadoAnterior && objetoInterseccionadoAnterior !== objeto3DAsociado) {
+          // Apagamos el brillo del objeto que estuviera iluminado antes
+          const datosPrevios = mapaDatosObjeto.get(objetoInterseccionadoAnterior.id);
+          if (datosPrevios && datosPrevios.esGrupoComplejo) {
+            datosPrevios.componenteColor.material.color.setHex(datosPrevios.colorOriginal);
+            datosPrevios.componenteColor.material.emissive.setHex(0x000000);
+          }
+        }
+
+        // Iluminamos el componente marquesina asignado a este nodo
+        datosAsociados.componenteColor.material.emissive.setHex(0x334455);
+        objetoInterseccionadoAnterior = objeto3DAsociado;
+      });
+
+      // Al retirar el cursor del elemento de la lista -> Restauramos color original
+      item.addEventListener("mouseleave", () => {
+        datosAsociados.componenteColor.material.color.setHex(datosAsociados.colorOriginal);
+        datosAsociados.componenteColor.material.emissive.setHex(0x000000);
+        if (objetoInterseccionadoAnterior === objeto3DAsociado) {
+          objetoInterseccionadoAnterior = null;
+        }
+      });
+
+// B. Al hacer clic en la lista -> Desplazamos la cámara y clavamos el centro con un solo clic
+      item.addEventListener("click", () => {
+        if (!objeto3DAsociado) return;
+        
+        const posDestino = objeto3DAsociado.position;
+
+        // Definimos el punto exacto al que debe mirar el pivote de rotación
+        const targetCamara = new THREE.Vector3(posDestino.x, posDestino.y, posDestino.z);
+        
+        // Ajustamos la posición final ideal de la cámara aérea
+        const offsetCamara = new THREE.Vector3(
+          posDestino.x, 
+          posDestino.y + 45, 
+          posDestino.z + 75  
+        );
+
+        function interpolarCamara() {
+          // Calculamos la distancia que le falta a la cámara y al foco para llegar a su destino
+          const distCamara = camera.position.distanceTo(offsetCamara);
+          const distTarget = controls.target.distanceTo(targetCamara);
+
+          // Si todavía falta más de una fracción de milímetro, seguimos interpolando
+          if (distCamara > 0.01 || distTarget > 0.01) {
+            // Lerp asíncrono basado en la posición actual de cada frame
+            camera.position.lerp(offsetCamara, 0.1);
+            controls.target.lerp(targetCamara, 0.1);
+            
+            controls.update(); 
+            requestAnimationFrame(interpolarCamara);
+          } else {
+            // Por seguridad, cuando ya está absurdamente cerca, forzamos los valores exactos
+            camera.position.copy(offsetCamara);
+            controls.target.copy(targetCamara);
+            controls.update();
+          }
+        }
+        
+        // Arrancamos la aproximación continua
+        interpolarCamara();
+      });
+    });
+    // =========================================================================
+  
+
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
+
+      // ACTUALIZACIÓN DE POSICIÓN 2D DE LAS ETIQUETAS SOBRE EL CANVAS HTML
+      const frustum = new THREE.Frustum();
+      const projScreenMatrix = new THREE.Matrix4();
+      projScreenMatrix.multiplyMatrices(
+        camera.projectionMatrix,
+        camera.matrixWorldInverse,
+      );
+      frustum.setFromProjectionMatrix(projScreenMatrix);
+
+      referenciasEtiquetas.forEach((item) => {
+        const wp = item.pos3D.clone();
+
+        // Si el nodo queda a espaldas de la cámara activa, se oculta la opacidad por completo
+        if (!frustum.containsPoint(wp)) {
+          item.element.style.opacity = "0";
+          return;
+        }
+
+        // Proyectar el punto 3D en coordenadas cartesianas normalizadas de pantalla (-1 a 1)
+        wp.project(camera);
+
+        // Traducir las coordenadas normalizadas a píxeles exactos relativos al viewport del lienzo
+        const xPix = (wp.x * 0.5 + 0.5) * width;
+        const yPix = (-(wp.y * 0.5) + 0.5) * height;
+
+        // Traslación por hardware fluida sin provocar relayouts en el DOM
+        item.element.style.transform = `translate(-50%, -100%) translate(${xPix}px, ${yPix}px)`;
+        item.element.style.opacity = "1";
+      });
 
       raycaster.setFromCamera(mouse, camera);
       const intersections = raycaster.intersectObjects(
