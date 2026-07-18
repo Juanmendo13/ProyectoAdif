@@ -1,0 +1,653 @@
+---
+// src/pages/[linea]/mapa-3d.astro
+import fs from "node:fs";
+import path from "node:path";
+import "../../styles/global.css";
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
+
+// Importación segmentada limpia de los datos de infraestructura externa
+import { CONFIG_MAPAS, TRAMOS_VIAS } from "../../data/geo-infraestructura.js";
+export function getStaticPaths() {
+  return [
+    { params: { linea: "pe-17" } },
+    { params: { linea: "pe-24" } },
+    { params: { linea: "pe-26" } },
+  ];
+}
+
+const { linea } = Astro.params;
+const codigoLineaUpper = linea.toUpperCase();
+
+const coordMapa = CONFIG_MAPAS[codigoLineaUpper] || {};
+const tramosDeEstaLinea = TRAMOS_VIAS[linea] || [];
+const estacionesUnicas = [...new Set(tramosDeEstaLinea.flat())];
+
+// Detección automática de subestaciones por lectura de archivos de consigna
+const limpiarParaMatch = (str: string) => {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+};
+
+const docsDir = path.join(process.cwd(), "public", "docs", "Consignas finales");
+const subestacionesDetectadas = new Set<string>();
+
+if (fs.existsSync(docsDir)) {
+  const allFiles = fs.readdirSync(docsDir, { recursive: true }) as string[];
+  allFiles.forEach((file) => {
+    const normPath = file.replace(/\\/g, "/");
+    if (normPath.toLowerCase().startsWith(linea.toLowerCase() + "/")) {
+      const fileName = normPath.split("/").pop() || "";
+      if (
+        fileName.toLowerCase().includes("s.e.") ||
+        fileName.toLowerCase().includes("subestacion")
+      ) {
+        subestacionesDetectadas.add(limpiarParaMatch(fileName));
+      }
+    }
+  });
+}
+
+// Mapeado completo de nodos reales para pasárselo a Three.js
+const nodosEstructurados = estacionesUnicas.map((nombre) => {
+  const coords = coordMapa[nombre] || { x: 50, y: 50 };
+  const tokenEstacion = limpiarParaMatch(nombre);
+  let tieneSub = false;
+
+  subestacionesDetectadas.forEach((subToken) => {
+    if (subToken.includes(tokenEstacion) || tokenEstacion.includes(subToken))
+      tieneSub = true;
+  });
+
+  if (
+    [
+      "Dos Hermanas",
+      "Lebrija",
+      "Cortadura",
+      "Lora del Río",
+      "Sevilla Santa Justa",
+    ].includes(nombre)
+  ) {
+    tieneSub = true;
+  }
+
+  // Generación exacta del slug compatible con las rutas del dashboard original
+  const slugEstacion = nombre
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/[\s\-]+/g, "-")
+    .replace(/[^a-z0-9\-áéíóúñ]/g, "");
+
+  return {
+    nombre,
+    slug: slugEstacion,
+    x: coords.x * 15,
+    y: coords.y * 7,
+    tieneSub,
+  };
+});
+
+const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
+  return tramo.map((nombreEst, idx) => {
+    if (
+      linea === "pe-26" &&
+      tramo.includes("Apd. S. Jerónimo-Apd. Estadio-Apd. Cartuja") &&
+      idx === 0
+    ) {
+      const m = coordMapa["Majarabique"] || { x: 92, y: 25 };
+      const a = coordMapa["Alamillo"] || { x: 84, y: 27 };
+      return { x: ((m.x + a.x) / 2) * 15, y: ((m.y + a.y) / 2) * 7 };
+    }
+    const coords = coordMapa[nombreEst] || { x: 50, y: 50 };
+    return { x: coords.x * 15, y: coords.y * 7 };
+  });
+});
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Maqueta Volumétrica 3D - {codigoLineaUpper}</title>
+  </head>
+  <body class="bg-slate-950 min-h-screen flex flex-col antialiased text-white">
+    <Header lineaActiva={linea} />
+
+    <main
+      class="max-w-[1600px] mx-auto p-4 md:p-8 w-full flex-1 flex flex-col min-h-0"
+    >
+      <div
+        class="flex items-center gap-4 mb-6 border-b border-slate-800 pb-4 shrink-0"
+      >
+        <span
+          class="text-xs font-mono uppercase bg-cyan-950 text-cyan-300 border border-cyan-800/80 px-3 py-1 rounded font-bold"
+        >
+          {codigoLineaUpper} - LABORATORIO INTERACTIVO
+        </span>
+        <h1 class="text-xl font-bold tracking-tight">
+          Esquema Volumétrico de la Red
+        </h1>
+      </div>
+
+      <div
+        class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-stretch min-h-0"
+      >
+        <!-- PANEL IZQUIERDO: SECCIÓN DE DATOS DE RED -->
+        <div class="lg:col-span-4 flex flex-col gap-4">
+          <div
+            class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl"
+          >
+            <h2
+              class="text-xs font-bold uppercase text-amber-500 tracking-widest mb-1"
+            >
+              Control de Navegación
+            </h2>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Pasa el ratón por encima de cualquier estructura en el lienzo 3D
+              para iluminarla. **Haz clic izquierdo directo** sobre el prisma
+              para abrir instantáneamente sus planos técnicos de
+              electrificación.
+            </p>
+          </div>
+
+          <div
+            class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 overflow-y-auto max-h-[400px] lg:max-h-none"
+          >
+            <h3
+              class="text-xs font-bold uppercase text-slate-400 tracking-widest border-b border-slate-800 pb-2 mb-3"
+            >
+              Nodos Identificados ({nodosEstructurados.length})
+            </h3>
+            <ul class="space-y-1 text-xs text-slate-400">
+              {
+                nodosEstructurados.map((n) => (
+                  <li class="p-2 bg-slate-950/40 border border-slate-900 rounded-lg flex justify-between items-center group hover:border-slate-700 transition-colors">
+                    <a
+                      href={`/${linea}/${n.slug}`}
+                      class="font-medium text-slate-200 group-hover:text-cyan-400 transition-colors"
+                    >
+                      {n.nombre}
+                    </a>
+                    <span
+                      class={`text-[10px] font-mono px-2 py-0.5 rounded border ${n.tieneSub ? "text-amber-400 bg-amber-950/50 border-amber-900" : "text-cyan-400 bg-cyan-950/50 border-cyan-900"}`}
+                    >
+                      {n.tieneSub ? "S/E" : "ESTACIÓN"}
+                    </span>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+        </div>
+
+        <!-- PANEL DERECHO: INTERFAZ WEBGL CANVAS -->
+        <div
+          class="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl relative min-h-[500px] lg:min-h-0 overflow-hidden flex flex-col shadow-2xl"
+        >
+          <!-- Tooltip flotante reactivo -->
+          <div
+            id="3d-tooltip"
+            class="absolute pointer-events-none bg-slate-950/95 border border-slate-800 text-white font-sans text-xs font-semibold px-3 py-2 rounded-xl hidden z-20 shadow-xl transition-opacity duration-150"
+          >
+          </div>
+
+          <div
+            class="absolute top-4 left-4 z-10 bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-lg text-[11px] text-slate-300 font-mono flex gap-4"
+          >
+            <div>
+              Render: <span class="text-emerald-400"
+                >Three.js Raycaster Map</span
+              >
+            </div>
+            <div class="text-slate-500">|</div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Subestaciones
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-cyan-500"></span> Estaciones
+            </div>
+          </div>
+
+          <div
+            id="container-3d"
+            data-nodos={JSON.stringify(nodosEstructurados)}
+            data-tramos={JSON.stringify(tramosPara3D)}
+            data-lineacod={linea}
+            class="w-full h-full flex-1"
+          >
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <Footer />
+  </body>
+</html>
+<script>
+  import * as THREE from "three";
+  import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+  function initThreeJS() {
+    const container = document.getElementById("container-3d");
+    const tooltip = document.getElementById("3d-tooltip");
+    if (!container || !tooltip) return;
+
+    const nodos = JSON.parse(container.getAttribute("data-nodos") || "[]");
+    const tramos = JSON.parse(container.getAttribute("data-tramos") || "[]");
+    const lineaCod = container.getAttribute("data-lineacod");
+
+    if (nodos.length === 0) return;
+
+    const width = container.clientWidth || 800;
+    const height = container.clientHeight || 500;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x020617);
+
+    const camera = new THREE.PerspectiveCamera(45, width / height, 1, 2000);
+    camera.position.set(0, 180, 260);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    const ambientLight = new THREE.AmbientLight(0x475569, 2.2);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    directionalLight.position.set(100, 250, 100);
+
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    const d = 400;
+    directionalLight.shadow.camera.left = -d;
+    directionalLight.shadow.camera.right = d;
+    directionalLight.shadow.camera.top = d;
+    directionalLight.shadow.camera.bottom = -d;
+    directionalLight.shadow.camera.far = 1500;
+
+    scene.add(directionalLight);
+
+    const xValues = nodos.map((n: any) => n.x);
+    const yValues = nodos.map((n: any) => n.y);
+    const minX = Math.min(...xValues);
+    const maxX = Math.max(...xValues);
+    const minY = Math.min(...yValues);
+    const maxY = Math.max(...yValues);
+
+    const centroX = (minX + maxX) / 2;
+    const centroZ = (minY + maxY) / 2;
+    const rangoMax = Math.max(maxX - minX, maxY - minY) || 1;
+    const escala = 240 / rangoMax;
+
+    const objetosInteractivos: THREE.Object3D[] = [];
+    const mapaDatosObjeto = new Map();
+
+    // 1. Renderizado de Edificios
+    nodos.forEach((nodo: any) => {
+      const posX = (nodo.x - centroX) * escala;
+      const posZ = (nodo.y - centroZ) * escala;
+
+      const altura = nodo.tieneSub ? 16 : 8;
+      const baseDim = nodo.tieneSub ? 9 : 5.5;
+      const colorMesh = nodo.tieneSub ? 0xf59e0b : 0x06b6d4;
+
+      const geometry = new THREE.BoxGeometry(baseDim, altura, baseDim);
+      const material = new THREE.MeshStandardMaterial({
+        color: colorMesh,
+        roughness: 0.2,
+        metalness: 0.4,
+        transparent: true,
+        opacity: 0.85,
+      });
+
+      const edificio = new THREE.Mesh(geometry, material);
+      edificio.position.set(posX, altura / 2, posZ);
+
+      edificio.castShadow = true;
+      edificio.receiveShadow = true;
+
+      scene.add(edificio);
+
+      mapaDatosObjeto.set(edificio.id, {
+        nombre: nodo.nombre,
+        slug: nodo.slug,
+        tipo: nodo.tieneSub ? "Subestación S/E" : "Estación Ferroviaria",
+        colorOriginal: colorMesh,
+      });
+      objetosInteractivos.push(edificio);
+
+      const edges = new THREE.EdgesGeometry(geometry);
+      const wireframe = new THREE.LineSegments(
+        edges,
+        new THREE.LineBasicMaterial({
+          color: 0xffffff,
+          opacity: 0.15,
+          transparent: true,
+        }),
+      );
+      wireframe.position.copy(edificio.position);
+      scene.add(wireframe);
+    });
+
+    // Array global para amoldar el terreno (BIEN UBICADO)
+    const todosLosPuntosDeVias: THREE.Vector3[] = [];
+
+    // 2. GENERADOR REAL DE VÍAS FERROVIARIAS
+    tramos.forEach((tram) => {
+      const puntosTramo3D = tram.map((punpoint: any) => {
+        const posX = (punpoint.x - centroX) * escala;
+        const posZ = (punpoint.y - centroZ) * escala;
+        return new THREE.Vector3(posX, 0, posZ);
+      });
+
+      if (puntosTramo3D.length > 1) {
+        const curvaVia = new THREE.CatmullRomCurve3(puntosTramo3D);
+        curvaVia.curveType = "centripetal";
+
+        const anchoVia = 5.0;
+        const radioRail = 0.45;
+        const pasoTraviesas = 4.0;
+
+        const divisiones = tram.length * 20;
+        const puntosCentro: THREE.Vector3[] = [];
+        const perpendiculares: THREE.Vector3[] = [];
+
+        for (let i = 0; i <= divisiones; i++) {
+          const t = i / divisiones;
+          const posCentro = curvaVia.getPointAt(t);
+          const tangente = curvaVia.getTangentAt(t).normalize();
+          const perpendicular = new THREE.Vector3(
+            -tangente.z,
+            0,
+            tangente.x,
+          ).normalize();
+
+          puntosCentro.push(posCentro);
+          perpendiculares.push(perpendicular);
+        }
+
+        // A. BALASTO
+        const geometryBalasto = new THREE.BufferGeometry();
+        const verticesBalasto: number[] = [];
+        const anchoBalasto = anchoVia * 1.5;
+
+        for (let i = 0; i <= divisiones; i++) {
+          const pos = puntosCentro[i];
+          const perp = perpendiculares[i];
+          const pIzq = pos.clone().addScaledVector(perp, anchoBalasto / 2);
+          const pDer = pos.clone().addScaledVector(perp, -anchoBalasto / 2);
+
+          verticesBalasto.push(pIzq.x, 0.02, pIzq.z);
+          verticesBalasto.push(pDer.x, 0.02, pDer.z);
+        }
+
+        const indicesBalasto: number[] = [];
+        for (let i = 0; i < divisiones; i++) {
+          const vid = i * 2;
+          indicesBalasto.push(vid, vid + 1, vid + 2);
+          indicesBalasto.push(vid + 1, vid + 3, vid + 2);
+        }
+
+        geometryBalasto.setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute(verticesBalasto, 3),
+        );
+        geometryBalasto.setIndex(indicesBalasto);
+        geometryBalasto.computeVertexNormals();
+
+        const materialBalasto = new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
+          roughness: 0.9,
+          metalness: 0.1,
+          side: THREE.DoubleSide,
+        });
+        const balasto = new THREE.Mesh(geometryBalasto, materialBalasto);
+        scene.add(balasto);
+
+        // B. TRAVIESAS INDEPENDIENTES
+        const longitudCurva = curvaVia.getLength();
+        const numeroTraviesas = Math.floor(longitudCurva / pasoTraviesas);
+        const geomTraviesa = new THREE.BoxGeometry(anchoVia * 1.4, 0.3, 0.8);
+        const materialMadera = new THREE.MeshStandardMaterial({
+          color: 0x78350f,
+          roughness: 0.8,
+          metalness: 0.1,
+        });
+
+        for (let j = 0; j <= numeroTraviesas; j++) {
+          const t = j / numeroTraviesas;
+          const posCentro = curvaVia.getPointAt(t);
+          const tangente = curvaVia.getTangentAt(t).normalize();
+
+          const traviesa = new THREE.Mesh(geomTraviesa, materialMadera);
+          traviesa.position.copy(posCentro).setY(0.2);
+
+          const anguloY = Math.atan2(tangente.x, tangente.z);
+          traviesa.rotation.y = anguloY;
+
+          scene.add(traviesa);
+        }
+
+        // C. DOBLE CARRIL DE ACERO
+        const puntosCarrilIzq: THREE.Vector3[] = [];
+        const puntosCarrilDer: THREE.Vector3[] = [];
+
+        for (let i = 0; i <= divisiones; i++) {
+          const pos = puntosCentro[i];
+          const perp = perpendiculares[i];
+
+          puntosCarrilIzq.push(pos.clone().addScaledVector(perp, anchoVia / 2).setY(0.4));
+          puntosCarrilDer.push(pos.clone().addScaledVector(perp, -anchoVia / 2).setY(0.4));
+        }
+
+        const materialAcero = new THREE.MeshStandardMaterial({
+          color: 0x94a3b8,
+          metalness: 0.9,
+          roughness: 0.2,
+        });
+
+        const curvaIzq = new THREE.CatmullRomCurve3(puntosCarrilIzq);
+        const geomCarrilIzq = new THREE.TubeGeometry(curvaIzq, divisiones, radioRail, 6, false);
+        const carrilIzq = new THREE.Mesh(geomCarrilIzq, materialAcero);
+        scene.add(carrilIzq);
+
+        const curvaDer = new THREE.CatmullRomCurve3(puntosCarrilDer);
+        const geomCarrilDer = new THREE.TubeGeometry(curvaDer, divisiones, radioRail, 6, false);
+        const carrilDer = new THREE.Mesh(geomCarrilDer, materialAcero);
+        scene.add(carrilDer);
+
+        // Alimentamos los puntos para el aplanado adaptativo
+        todosLosPuntosDeVias.push(...puntosCentro);
+      }
+    });
+
+    // 3. GEOMETRÍA DE ALTA RESOLUCIÓN DEL TERRENO
+    const tamañoTerreno = 1000;
+    const segmentos = 256;
+    const terrainGeo = new THREE.PlaneGeometry(tamañoTerreno, tamañoTerreno, segmentos, segmentos);
+
+    const posAttr = terrainGeo.attributes.position;
+    const verticesCount = posAttr.count;
+
+    for (let i = 0; i < verticesCount; i++) {
+      const localX = posAttr.getX(i);
+      const localY = posAttr.getY(i);
+
+      const mundoX = localX;
+      const mundoZ = -localY;
+
+      let distanciaMinimaAVia = Infinity;
+
+      if (todosLosPuntosDeVias.length > 0) {
+        for (let j = 0; j < todosLosPuntosDeVias.length; j += 4) {
+          const puntoVia = todosLosPuntosDeVias[j];
+          const dx = mundoX - puntoVia.x;
+          const dz = mundoZ - puntoVia.z;
+          const distSq = dx * dx + dz * dz;
+
+          if (distSq < distanciaMinimaAVia) {
+            distanciaMinimaAVia = distSq;
+          }
+        }
+        distanciaMinimaAVia = Math.sqrt(distanciaMinimaAVia);
+      } else {
+        distanciaMinimaAVia = 999;
+      }
+
+      const factorElevacion = THREE.MathUtils.smoothstep(distanciaMinimaAVia, 20, 90);
+
+      let z = Math.sin(mundoX * 0.01) * Math.cos(mundoZ * 0.01) * 35;
+      z += Math.sin(mundoX * 0.03) * Math.sin(mundoZ * 0.02) * 12;
+      z += Math.cos(mundoX * 0.08) * Math.sin(mundoZ * 0.08) * 3;
+
+      posAttr.setZ(i, z * factorElevacion);
+    }
+
+    terrainGeo.computeVertexNormals();
+    posAttr.needsUpdate = true;
+
+    // 4. TEXTURA DIFUMINADA DINÁMICA
+    const canvasTextura = document.createElement("canvas");
+    canvasTextura.width = 1024;
+    canvasTextura.height = 1024;
+    const ctx = canvasTextura.getContext("2d");
+
+    if (ctx) {
+      ctx.fillStyle = "#6e5643";
+      ctx.fillRect(0, 0, 1024, 1024);
+
+      for (let i = 0; i < 40; i++) {
+        const posX = Math.random() * 1024;
+        const posY = Math.random() * 1024;
+        const radioBosque = 100 + Math.random() * 150;
+
+        const gradiente = ctx.createRadialGradient(posX, posY, 10, posX, posY, radioBosque);
+        gradiente.addColorStop(0, "rgba(46, 94, 52, 0.85)");
+        gradiente.addColorStop(0.5, "rgba(67, 115, 74, 0.5)");
+        gradiente.addColorStop(1, "rgba(110, 86, 67, 0)");
+
+        ctx.fillStyle = gradiente;
+        ctx.beginPath();
+        ctx.arc(posX, posY, radioBosque, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    const texturaTerreno = new THREE.CanvasTexture(canvasTextura);
+
+    const terrainMat = new THREE.MeshStandardMaterial({
+      map: texturaTerreno,
+      roughness: 0.9,
+      metalness: 0.1,
+      flatShading: false,
+    });
+
+    const terrain = new THREE.Mesh(terrainGeo, terrainMat);
+    terrain.rotation.x = -Math.PI / 2;
+    terrain.receiveShadow = true;
+    scene.add(terrain);
+
+    // INTERACTIVIDAD (RAYCASTER)
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let objetoInterseccionadoAnterior: any = null;
+
+    function onMouseMove(event: MouseEvent) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      tooltip!.style.left = `${event.clientX - rect.left + 15}px`;
+      tooltip!.style.top = `${event.clientY - rect.top + 15}px`;
+    }
+
+    function onDocumentClick(event: MouseEvent) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersections = raycaster.intersectObjects(objetosInteractivos);
+
+      if (intersections.length > 0) {
+        const meshTarget = intersections[0].object;
+        const datos = mapaDatosObjeto.get(meshTarget.id);
+        if (datos && datos.slug) {
+          window.location.href = `/${lineaCod}/${datos.slug}`;
+        }
+      }
+    }
+
+    container.addEventListener("mousemove", onMouseMove);
+    container.addEventListener("click", onDocumentClick);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersections = raycaster.intersectObjects(objetosInteractivos);
+
+      if (intersections.length > 0) {
+        const objetoActual = intersections[0].object as THREE.Mesh;
+
+        if (objetoInterseccionadoAnterior !== objetoActual) {
+          if (objetoInterseccionadoAnterior) {
+            const datosPrevios = mapaDatosObjeto.get(objetoInterseccionadoAnterior.id);
+            (objetoInterseccionadoAnterior.material as THREE.MeshStandardMaterial).color.setHex(datosPrevios.colorOriginal);
+            (objetoInterseccionadoAnterior.material as THREE.MeshStandardMaterial).emissive.setHex(0x000000);
+          }
+
+          objetoInterseccionadoAnterior = objetoActual;
+
+          const mat = objetoActual.material as THREE.MeshStandardMaterial;
+          mat.emissive.setHex(0x334155);
+          container!.style.cursor = "pointer";
+
+          const datos = mapaDatosObjeto.get(objetoActual.id);
+          tooltip!.innerHTML = `
+            <div class="text-white font-bold">${datos.nombre}</div>
+            <div class="text-slate-400 text-[10px] mt-0.5 uppercase tracking-wider font-mono">${datos.tipo}</div>
+            <div class="text-emerald-400 text-[10px] mt-1 font-medium">➔ Clic para abrir planos</div>
+          `;
+          tooltip!.style.display = "block";
+        }
+      } else {
+        if (objetoInterseccionadoAnterior) {
+          const datosPrevios = mapaDatosObjeto.get(objetoInterseccionadoAnterior.id);
+          (objetoInterseccionadoAnterior.material as THREE.MeshStandardMaterial).color.setHex(datosPrevios.colorOriginal);
+          (objetoInterseccionadoAnterior.material as THREE.MeshStandardMaterial).emissive.setHex(0x000000);
+          objetoInterseccionadoAnterior = null;
+          container!.style.cursor = "grab";
+          tooltip!.style.display = "none";
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener("resize", () => {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    });
+  }
+
+  initThreeJS();
+</script>
