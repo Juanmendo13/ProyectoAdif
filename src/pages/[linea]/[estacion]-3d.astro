@@ -1,10 +1,23 @@
 ---
 // src/pages/[linea]/[estacion]-3d.astro
+import fs from "node:fs";
+import path from "node:path";
 import Header from "../../components/Header.astro";
 import Footer from "../../components/Footer.astro";
 import "../../styles/global.css";
 
-import { CONFIG_MAPAS, TRAMOS_VIAS } from "../../data/geo-infraestructura.js";
+import { TRAMOS_VIAS } from "../../data/geo-infraestructura.js";
+
+// Función auxiliar idéntica para limpiar de raíz tildes y caracteres especiales
+const limpiarString = (str: string) => {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Elimina tildes
+    .replace(/[^a-z0-9]/g, " ") // Cambia símbolos por espacios
+    .replace(/\s+/g, " ") // Colapsa múltiples espacios
+    .trim();
+};
 
 export function getStaticPaths() {
   const lineas = ["pe-17", "pe-24", "pe-26"];
@@ -22,13 +35,8 @@ export function getStaticPaths() {
         .replace(/[^a-z0-9\-áéíóúñ]/g, "");
 
       paths.push({
-        params: {
-          linea: linea,
-          estacion: slugEstacion,
-        },
-        props: {
-          nombreReal: nombre,
-        },
+        params: { linea, estacion: slugEstacion },
+        props: { nombreReal: nombre },
       });
     });
   });
@@ -38,6 +46,57 @@ export function getStaticPaths() {
 
 const { linea, estacion } = Astro.params;
 const { nombreReal } = Astro.props;
+
+// ==========================================
+// 1. CONTROL DINÁMICO DE CONSIGNAS A
+// ==========================================
+const pdfLimpio = estacion.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const docsDirA = path.join(
+  process.cwd(),
+  "public",
+  "docs",
+  "ConsignasA",
+  linea,
+  `${pdfLimpio}.pdf`,
+);
+
+const tieneConsignaA = fs.existsSync(docsDirA);
+const urlConsignaA = tieneConsignaA
+  ? `/docs/ConsignasA/${linea}/${pdfLimpio}.pdf`
+  : "#";
+
+// ==========================================
+// 2. CONTROL DINÁMICO DE CONSIGNAS ELÉCTRICAS
+// ==========================================
+const docsDirElec = path.join(
+  process.cwd(),
+  "public",
+  "docs",
+  "ConsignasElectricas",
+);
+let pdfElectricoUrl = null;
+
+if (fs.existsSync(docsDirElec)) {
+  const allFiles = fs.readdirSync(docsDirElec, { recursive: true }) as string[];
+  const estacionToken = limpiarString(estacion);
+
+  allFiles.forEach((file) => {
+    const normPath = file.replace(/\\/g, "/");
+    const parts = normPath.split("/");
+
+    if (parts.length > 1 && parts[0].toLowerCase() === linea.toLowerCase()) {
+      const fileName = parts[parts.length - 1];
+      const fileNameLimpio = limpiarString(fileName);
+
+      if (fileNameLimpio.includes(estacionToken)) {
+        pdfElectricoUrl = `/docs/ConsignasElectricas/${normPath}`;
+      }
+    }
+  });
+}
+
+const pdfElectrico = pdfElectricoUrl || "#";
+const tieneElectrica = pdfElectricoUrl !== null;
 ---
 
 <!doctype html>
@@ -50,13 +109,11 @@ const { nombreReal } = Astro.props;
   <body
     class="bg-slate-950 text-slate-100 m-0 p-0 overflow-hidden select-none font-sans"
   >
-    <!-- Tu Header global adaptado -->
     <Header />
 
     <div
       class="relative w-full h-[calc(100vh-64px)] bg-slate-950 overflow-hidden"
     >
-      <!-- INTERFAZ FLOTANTE: CONTROLES Y VOLVER -->
       <!-- INTERFAZ FLOTANTE: CONTROLES Y VOLVER -->
       <div
         class="absolute top-0 left-0 w-full z-30 p-6 flex justify-between items-center pointer-events-none"
@@ -66,7 +123,6 @@ const { nombreReal } = Astro.props;
             href={`/${linea}/mapa-3d`}
             class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-400 hover:text-white hover:border-slate-600 transition-all shadow-xl"
           >
-            <!-- ... resto del código sin tocar nada más ... -->
             ← Volver al Mapa General
           </a>
           <h1
@@ -91,43 +147,69 @@ const { nombreReal } = Astro.props;
             Expediente Técnico del Nodo
           </h3>
           <div class="space-y-2 text-xs">
-            <div
-              class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 hover:border-amber-500/40 transition-colors cursor-pointer group"
+            <!-- Botón Lateral Eléctrico -->
+            <a
+              href={pdfElectrico}
+              target={tieneElectrica ? "_blank" : undefined}
+              class={`block p-2.5 rounded-lg bg-slate-950/60 border transition-colors group text-left decoration-none ${
+                tieneElectrica
+                  ? "border-slate-800 hover:border-amber-500/40 cursor-pointer"
+                  : "border-slate-900/40 opacity-40 pointer-events-none select-none"
+              }`}
               id="btn-consigna-elec"
             >
               <div class="flex justify-between items-center mb-1">
                 <span
-                  class="font-medium text-slate-200 group-hover:text-amber-400 transition-colors"
-                  >Consigna de Electrificación</span
+                  class={`font-medium ${tieneElectrica ? "text-slate-200 group-hover:text-amber-400" : "text-slate-500"}`}
                 >
+                  Consigna de Electrificación
+                </span>
                 <span
                   class="text-[10px] px-1.5 py-0.2 bg-amber-500/10 text-amber-400 rounded font-mono"
-                  >C-ELE-04</span
                 >
+                  {tieneElectrica ? "C-ELE-04" : "N/D"}
+                </span>
               </div>
               <p class="text-slate-500 text-[11px]">
-                Enlace y esquemas de seccionadores de catenaria.
+                {
+                  tieneElectrica
+                    ? "Enlace y esquemas de seccionadores de catenaria."
+                    : "Documento técnico no disponible."
+                }
               </p>
-            </div>
+            </a>
 
-            <div
-              class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 hover:border-cyan-500/40 transition-colors cursor-pointer group"
+            <!-- Botón Lateral Serie A -->
+            <a
+              href={urlConsignaA}
+              target={tieneConsignaA ? "_blank" : undefined}
+              class={`block p-2.5 rounded-lg bg-slate-950/60 border transition-colors group text-left decoration-none ${
+                tieneConsignaA
+                  ? "border-slate-800 hover:border-cyan-500/40 cursor-pointer"
+                  : "border-slate-900/40 opacity-40 pointer-events-none select-none"
+              }`}
               id="btn-consigna-a"
             >
               <div class="flex justify-between items-center mb-1">
                 <span
-                  class="font-medium text-slate-200 group-hover:text-cyan-400 transition-colors"
-                  >Consigna A</span
+                  class={`font-medium ${tieneConsignaA ? "text-slate-200 group-hover:text-cyan-400" : "text-slate-500"}`}
                 >
+                  Consigna A
+                </span>
                 <span
                   class="text-[10px] px-1.5 py-0.2 bg-cyan-500/10 text-cyan-400 rounded font-mono"
-                  >REG-A</span
                 >
+                  {tieneConsignaA ? "REG-A" : "N/D"}
+                </span>
               </div>
               <p class="text-slate-500 text-[11px]">
-                Normativa de bloqueo y seguridad en andenes.
+                {
+                  tieneConsignaA
+                    ? "Normativa de bloqueo y seguridad en andenes."
+                    : "Documento técnico no disponible."
+                }
               </p>
-            </div>
+            </a>
           </div>
         </div>
       </div>
@@ -141,7 +223,6 @@ const { nombreReal } = Astro.props;
         id="svg-guias"
         class="absolute inset-0 w-full h-full pointer-events-none z-20"
       >
-        <!-- Las líneas poligonales se inyectan dinámicamente desde el script -->
       </svg>
 
       <!-- CAPA DE TARJETAS FLOTANTES HTML -->
@@ -149,7 +230,7 @@ const { nombreReal } = Astro.props;
         id="html-labels"
         class="absolute inset-0 w-full h-full pointer-events-none z-20"
       >
-        <!-- Cartel 1: Consigna de Electrificación -->
+        <!-- Cartel 1 Flotante 3D: Consigna de Electrificación -->
         <div
           id="tag-consigna-elec"
           class="absolute pointer-events-auto bg-slate-900/95 border border-amber-500/40 p-3 rounded-xl shadow-2xl w-56 text-xs hidden backdrop-blur-sm"
@@ -158,13 +239,27 @@ const { nombreReal } = Astro.props;
             ⚡ Consigna Electrificación
           </div>
           <p class="text-slate-400 text-[11px] mb-2">
-            Punto de acometida y feeders de tracción.
+            {
+              tieneElectrica
+                ? "Punto de acometida y feeders de tracción."
+                : "No se dispone de archivo de electrificación."
+            }
           </p>
-          <a
-            href="#"
-            class="inline-block text-center w-full bg-slate-800 hover:bg-amber-600 text-white rounded p-1 transition-colors font-medium"
-            >Abrir Documento PDF</a
-          >
+          {
+            tieneElectrica ? (
+              <a
+                href={pdfElectrico}
+                target="_blank"
+                class="inline-block text-center w-full bg-slate-800 hover:bg-amber-600 text-white rounded p-1 transition-colors font-medium"
+              >
+                Abrir Documento PDF
+              </a>
+            ) : (
+              <span class="inline-block text-center w-full bg-slate-950 text-slate-600 rounded p-1 font-medium border border-slate-900/40 cursor-not-allowed">
+                No Disponible
+              </span>
+            )
+          }
         </div>
 
         <!-- Cartel 2: Consigna A -->
@@ -176,22 +271,33 @@ const { nombreReal } = Astro.props;
             🏢 Consigna A (Estación)
           </div>
           <p class="text-slate-400 text-[11px] mb-2">
-            Gálibos de andén y cableado de señales.
+            {
+              tieneConsignaA
+                ? "Gálibos de andén y cableado de señales."
+                : "No se han encontrado planos para este nodo."
+            }
           </p>
-          <a
-            href="#"
-            class="inline-block text-center w-full bg-slate-800 hover:bg-cyan-600 text-white rounded p-1 transition-colors font-medium"
-            >Ver Planos Adjuntos</a
-          >
+          {
+            tieneConsignaA ? (
+              <a
+                href={urlConsignaA}
+                target="_blank"
+                class="inline-block text-center w-full bg-slate-800 hover:bg-cyan-600 text-white rounded p-1 transition-colors font-medium"
+              >
+                Ver Planos Adjuntos
+              </a>
+            ) : (
+              <span class="inline-block text-center w-full bg-slate-950 text-slate-600 rounded p-1 font-medium border border-slate-900/40 cursor-not-allowed">
+                No Disponible
+              </span>
+            )
+          }
         </div>
       </div>
     </div>
   </body>
 </html>
 
-<!-- SCRIPT COMPORTAMENTAL DE TERCEROS COMPILADO EN CLIENTE -->
-
-<!-- SCRIPT COMPORTAMENTAL DE TERCEROS COMPILADO EN CLIENTE -->
 <script>
   import * as THREE from "three";
   import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -201,7 +307,6 @@ const { nombreReal } = Astro.props;
   if (container) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x020617);
-    // scene.fog = new THREE.FogExp2(0x020617, 0.003);
 
     const persCamera = new THREE.PerspectiveCamera(
       45,
@@ -222,7 +327,6 @@ const { nombreReal } = Astro.props;
     controls.dampingFactor = 0.05;
     controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
-    // Luces globales
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
 
@@ -231,23 +335,16 @@ const { nombreReal } = Astro.props;
     dirLight.castShadow = true;
     scene.add(dirLight);
 
-    // Malla base/Suelo técnico
-
-    // =========================================================================
-    // ENTORNO REALISTA: CÉSPED TEXTURIZADO (URL CORREGIDA) Y SUELOS PLANOS
-    // =========================================================================
     const entornoGroup = new THREE.Group();
     scene.add(entornoGroup);
 
     const textureLoader = new THREE.TextureLoader();
 
-    // Cargamos la URL oficial de Three.js que ya sabemos que funciona sin fallos de CORS
     const texturaCesped = textureLoader.load(
       "https://threejs.org/examples/textures/terrain/grasslight-big.jpg",
       (texture) => {
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
-        // Al ser un plano grande de 400x400, repetimos 25 veces para mantener la escala real
         texture.repeat.set(25, 25);
       },
     );
@@ -260,12 +357,11 @@ const { nombreReal } = Astro.props;
 
     const cespedGeo = new THREE.PlaneGeometry(400, 400);
     const cespedMesh = new THREE.Mesh(cespedGeo, matCespedReal);
-    cespedMesh.rotation.x = -Math.PI / 2; // Totalmente plano
-    cespedMesh.position.y = -0.02; // Evita parpadeos con los cimientos
+    cespedMesh.rotation.x = -Math.PI / 2;
+    cespedMesh.position.y = -0.02;
     cespedMesh.receiveShadow = true;
     entornoGroup.add(cespedMesh);
 
-    // 2. EXPLANADA DE PARKING (Asfalto delante de la estación, eje Z positivo)
     const matAsfalto = new THREE.MeshStandardMaterial({
       color: 0x1e293b,
       roughness: 0.8,
@@ -277,7 +373,6 @@ const { nombreReal } = Astro.props;
     parkingMesh.receiveShadow = true;
     entornoGroup.add(parkingMesh);
 
-    // 3. ANDÉN PRINCIPAL (Hormigón gris entre el edificio y las vías, eje Z negativo)
     const matAndenHormigon = new THREE.MeshStandardMaterial({
       color: 0x475569,
       roughness: 0.7,
@@ -287,33 +382,23 @@ const { nombreReal } = Astro.props;
     andenMesh.position.set(0, 0.1, -11);
     andenMesh.receiveShadow = true;
     entornoGroup.add(andenMesh);
-    // =========================================================================
-    // RENDERIZADOR DINÁMICO DE COMPONENTES DE ESTACIÓN
-    // =========================================================================
+
     const edificioGroup = new THREE.Group();
     scene.add(edificioGroup);
 
-    // Inicializamos variables de anclaje para las Leader Lines
     let puntoAnclajeTejado = new THREE.Vector3(0, 15, 0);
     let puntoAlcanjeLateral = new THREE.Vector3(12, 4, 7);
-
-    // Bandera de control para evitar que el renderizador dibuje guías vacías
     let modeloCargado = false;
 
-    // Extraer el slug de la URL
-    // Extraer el slug de la URL
     const path = window.location.pathname.toLowerCase();
     let slugActual = path.split("/").pop().replace("-3d", "");
 
-    // =========================================================================
-    // SOLUCIÓN PARA LAS TILDES: Quitamos acentos para que coincida con el archivo .js
-    // =========================================================================
     slugActual = decodeURIComponent(slugActual)
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "");
+
     async function inicializarArquitecturaEstacion() {
       try {
-        // Intentamos importar dinámicamente el fichero específico de la estación
         const moduloEstacion = await import(
           `../../components/estaciones/${slugActual}.js`
         );
@@ -326,7 +411,6 @@ const { nombreReal } = Astro.props;
           `[GDT] Arquitectura personalizada cargada con éxito: ${slugActual}`,
         );
       } catch (error) {
-        // Si no existe, cargamos el Plan B genérico
         console.warn(
           `[GDT] No existe modelo para "${slugActual}". Cargando entorno regional genérico.`,
         );
@@ -339,19 +423,15 @@ const { nombreReal } = Astro.props;
           puntoAlcanjeLateral,
         );
       } finally {
-        // Habilitamos el dibujado de líneas una vez cargado el modelo
         modeloCargado = true;
       }
     }
 
-    // Ejecutamos la carga asíncrona
     inicializarArquitecturaEstacion();
 
-    // Elementos de la capa UI / SVG recapturados
     const svgOverlay = document.getElementById("svg-guias");
     const tagElec = document.getElementById("tag-consigna-elec");
     const tagConsignaA = document.getElementById("tag-consigna-a");
-
     function proyectarLineasYEtiquetas() {
       if (!svgOverlay || !tagElec || !tagConsignaA || !modeloCargado) return;
 
@@ -362,18 +442,19 @@ const { nombreReal } = Astro.props;
           punto3D: puntoAnclajeTejado,
           tagHTML: tagElec,
           offsetX: 160,
-          offsetY: -120, // Lo subimos un pelín más por si acaso
+          offsetY: -120,
           color: "#f59e0b",
         },
         {
           punto3D: puntoAlcanjeLateral,
           tagHTML: tagConsignaA,
           offsetX: -240,
-          offsetY: -140, // <-- CAMBIO: Pasamos de -40 a -140 para elevar drásticamente el cartel
+          offsetY: -140,
           color: "#06b6d4",
         },
       ];
 
+      // CORREGIDO: Usamos el mismo nombre de la variable de arriba
       configuraciones.forEach((cfg) => {
         const wp = cfg.punto3D.clone();
         wp.project(persCamera);
