@@ -1,4 +1,5 @@
 ---
+// src/components/Header.astro
 const { lineaActiva } = Astro.props;
 ---
 
@@ -93,7 +94,7 @@ const { lineaActiva } = Astro.props;
           },
         ].map((l) => (
           <a
-            href={`/${l.id}`}
+            href={`/${l.id}/mapa-3d`}
             class={`px-4 py-2 rounded-lg transition-all duration-150 border text-center min-w-[75px] font-bold ${l.textColor} ${
               lineaActiva === l.id ? `${l.activeBg}` : "border-transparent"
             }`}
