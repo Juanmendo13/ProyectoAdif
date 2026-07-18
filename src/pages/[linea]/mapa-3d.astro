@@ -148,8 +148,8 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
             </h2>
             <p class="text-xs text-slate-400 leading-relaxed">
               Pasa el ratón por encima de cualquier estructura en el lienzo 3D
-              para iluminarla. **Haz clic izquierdo directo** sobre el prisma
-              para abrir instantáneamente sus planos técnicos de
+              para iluminarla. **Haz clic izquierdo directo** sobre la estación
+              u obra civil para abrir instantáneamente sus planos técnicos de
               electrificación.
             </p>
           </div>
@@ -227,6 +227,7 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
     <Footer />
   </body>
 </html>
+
 <script>
   import * as THREE from "three";
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -290,62 +291,14 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
     const centroX = (minX + maxX) / 2;
     const centroZ = (minY + maxY) / 2;
     const rangoMax = Math.max(maxX - minX, maxY - minY) || 1;
-    const escala = 240 / rangoMax;
-
+    const escala = 650 / rangoMax;
     const objetosInteractivos: THREE.Object3D[] = [];
     const mapaDatosObjeto = new Map();
 
-    // 1. Renderizado de Edificios
-    nodos.forEach((nodo: any) => {
-      const posX = (nodo.x - centroX) * escala;
-      const posZ = (nodo.y - centroZ) * escala;
-
-      const altura = nodo.tieneSub ? 16 : 8;
-      const baseDim = nodo.tieneSub ? 9 : 5.5;
-      const colorMesh = nodo.tieneSub ? 0xf59e0b : 0x06b6d4;
-
-      const geometry = new THREE.BoxGeometry(baseDim, altura, baseDim);
-      const material = new THREE.MeshStandardMaterial({
-        color: colorMesh,
-        roughness: 0.2,
-        metalness: 0.4,
-        transparent: true,
-        opacity: 0.85,
-      });
-
-      const edificio = new THREE.Mesh(geometry, material);
-      edificio.position.set(posX, altura / 2, posZ);
-
-      edificio.castShadow = true;
-      edificio.receiveShadow = true;
-
-      scene.add(edificio);
-
-      mapaDatosObjeto.set(edificio.id, {
-        nombre: nodo.nombre,
-        slug: nodo.slug,
-        tipo: nodo.tieneSub ? "Subestación S/E" : "Estación Ferroviaria",
-        colorOriginal: colorMesh,
-      });
-      objetosInteractivos.push(edificio);
-
-      const edges = new THREE.EdgesGeometry(geometry);
-      const wireframe = new THREE.LineSegments(
-        edges,
-        new THREE.LineBasicMaterial({
-          color: 0xffffff,
-          opacity: 0.15,
-          transparent: true,
-        }),
-      );
-      wireframe.position.copy(edificio.position);
-      scene.add(wireframe);
-    });
-
-    // Array global para amoldar el terreno (BIEN UBICADO)
+    // Array global necesario para alimentar y amoldar el terreno en base a las coordenadas de la vía
     const todosLosPuntosDeVias: THREE.Vector3[] = [];
 
-    // 2. GENERADOR REAL DE VÍAS FERROVIARIAS
+    // 1. GENERADOR DE VÍAS FERROVIARIAS (Y OBTENCIÓN DE DIODOS METRICOS)
     tramos.forEach((tram) => {
       const puntosTramo3D = tram.map((punpoint: any) => {
         const posX = (punpoint.x - centroX) * escala;
@@ -449,8 +402,18 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
           const pos = puntosCentro[i];
           const perp = perpendiculares[i];
 
-          puntosCarrilIzq.push(pos.clone().addScaledVector(perp, anchoVia / 2).setY(0.4));
-          puntosCarrilDer.push(pos.clone().addScaledVector(perp, -anchoVia / 2).setY(0.4));
+          puntosCarrilIzq.push(
+            pos
+              .clone()
+              .addScaledVector(perp, anchoVia / 2)
+              .setY(0.4),
+          );
+          puntosCarrilDer.push(
+            pos
+              .clone()
+              .addScaledVector(perp, -anchoVia / 2)
+              .setY(0.4),
+          );
         }
 
         const materialAcero = new THREE.MeshStandardMaterial({
@@ -460,24 +423,199 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
         });
 
         const curvaIzq = new THREE.CatmullRomCurve3(puntosCarrilIzq);
-        const geomCarrilIzq = new THREE.TubeGeometry(curvaIzq, divisiones, radioRail, 6, false);
+        const geomCarrilIzq = new THREE.TubeGeometry(
+          curvaIzq,
+          divisiones,
+          radioRail,
+          6,
+          false,
+        );
         const carrilIzq = new THREE.Mesh(geomCarrilIzq, materialAcero);
         scene.add(carrilIzq);
 
         const curvaDer = new THREE.CatmullRomCurve3(puntosCarrilDer);
-        const geomCarrilDer = new THREE.TubeGeometry(curvaDer, divisiones, radioRail, 6, false);
+        const geomCarrilDer = new THREE.TubeGeometry(
+          curvaDer,
+          divisiones,
+          radioRail,
+          6,
+          false,
+        );
         const carrilDer = new THREE.Mesh(geomCarrilDer, materialAcero);
         scene.add(carrilDer);
 
-        // Alimentamos los puntos para el aplanado adaptativo
         todosLosPuntosDeVias.push(...puntosCentro);
       }
     });
+    // 2. MODULACIÓN E INSTANCIACIÓN DE GRANDES EDIFICIOS DE VIAJEROS (ESTILO ADIF REALISTA)
+    nodos.forEach((nodo: any) => {
+      const posX = (nodo.x - centroX) * escala;
+      const posZ = (nodo.y - centroZ) * escala;
 
-    // 3. GEOMETRÍA DE ALTA RESOLUCIÓN DEL TERRENO
+      // === CÁLCULO DE ALTURA EXACTA DEL TERRENO EN LA POSICIÓN DEL NODO ===
+      let distanciaMinimaAVia = Infinity;
+      if (todosLosPuntosDeVias.length > 0) {
+        for (let j = 0; j < todosLosPuntosDeVias.length; j += 4) {
+          const puntoVia = todosLosPuntosDeVias[j];
+          const dx = posX - puntoVia.x;
+          const dz = posZ - puntoVia.z;
+          const distSq = dx * dx + dz * dz;
+          if (distSq < distanciaMinimaAVia) distanciaMinimaAVia = distSq;
+        }
+        distanciaMinimaAVia = Math.sqrt(distanciaMinimaAVia);
+      } else {
+        distanciaMinimaAVia = 999;
+      }
+
+      const factorElevacion = THREE.MathUtils.smoothstep(
+        distanciaMinimaAVia,
+        20,
+        90,
+      );
+      let alturaTerrenoY = Math.sin(posX * 0.01) * Math.cos(posZ * 0.01) * 35;
+      alturaTerrenoY += Math.sin(posX * 0.03) * Math.sin(posZ * 0.02) * 12;
+      alturaTerrenoY += Math.cos(posX * 0.08) * Math.sin(posZ * 0.08) * 3;
+      alturaTerrenoY *= factorElevacion;
+      // ===================================================================
+
+      const colorFuncional = nodo.tieneSub ? 0xf59e0b : 0x06b6d4;
+
+      // Grupo contenedor del complejo de la estación
+      const estacionVisual = new THREE.Group();
+
+      // MATERIALES COMUNES PARA EL COMPLEJO
+      const matMuros = new THREE.MeshStandardMaterial({
+        color: 0xeae6e1, // Blanco hueso / Arena claro realista de estación
+        roughness: 0.7,
+        metalness: 0.1,
+      });
+      const matZocalo = new THREE.MeshStandardMaterial({
+        color: 0x475569, // Gris pizarra para la base protectora e industrial
+        roughness: 0.8,
+      });
+      const matTejadoOriginal = new THREE.MeshStandardMaterial({
+        color: 0x9a3412, // Color arcilla/teja tradicional español
+        roughness: 0.7,
+        flatShading: true,
+      });
+
+      // A. EL ANDÉN INMIGRADO AL ENTORNO (Ahora mucho más largo, 45 unidades)
+      const andenGeo = new THREE.BoxGeometry(45, 1.2, 12);
+      const anden = new THREE.Mesh(andenGeo, matZocalo);
+      anden.position.set(0, 0.6, 0); // Apoyado en el suelo
+      anden.castShadow = true;
+      anden.receiveShadow = true;
+      estacionVisual.add(anden);
+
+      // B. EDIFICIO CENTRAL (Cuerpo principal de 2 plantas)
+      // Escala mayor para que se imponga como el centro logístico real
+      const cuerpoCentralGeo = new THREE.BoxGeometry(14, 11, 8);
+      const cuerpoCentral = new THREE.Mesh(cuerpoCentralGeo, matMuros);
+      cuerpoCentral.position.set(0, 5.5 + 1.2, -1.5); // Desplazado sutilmente hacia atrás del andén
+      cuerpoCentral.castShadow = true;
+      cuerpoCentral.receiveShadow = true;
+      estacionVisual.add(cuerpoCentral);
+
+      // Tejado del edificio central (Clásico a dos aguas sutil)
+      const tejadoCentralGeo = new THREE.ConeGeometry(9, 3, 4);
+      const tejadoCentral = new THREE.Mesh(tejadoCentralGeo, matTejadoOriginal);
+      tejadoCentral.position.set(0, 11 + 1.2 + 1.5, -1.5);
+      tejadoCentral.rotation.y = Math.PI / 4; // Alineación poligonal
+      tejadoCentral.scale.set(1.6, 1, 1.1);
+      tejadoCentral.castShadow = true;
+      estacionVisual.add(tejadoCentral);
+
+      // C. ALAS LATERALES ALARGADAS (Cuerpos de 1 planta a izquierda y derecha)
+      const alaGeo = new THREE.BoxGeometry(14, 6.5, 7);
+
+      const alaIzquierda = new THREE.Mesh(alaGeo, matMuros);
+      alaIzquierda.position.set(-14, 3.25 + 1.2, -1.5);
+      alaIzquierda.castShadow = true;
+      alaIzquierda.receiveShadow = true;
+      estacionVisual.add(alaIzquierda);
+
+      const alaDerecha = new THREE.Mesh(alaGeo, matMuros);
+      alaDerecha.position.set(14, 3.25 + 1.2, -1.5);
+      alaDerecha.castShadow = true;
+      alaDerecha.receiveShadow = true;
+      estacionVisual.add(alaDerecha);
+
+      // Tejados inclinados para las alas laterales
+      const tejadoAlaGeo = new THREE.BoxGeometry(15, 0.5, 7.5);
+
+      const tejadoAlaIzquierda = new THREE.Mesh(
+        tejadoAlaGeo,
+        matTejadoOriginal,
+      );
+      tejadoAlaIzquierda.position.set(-14, 6.5 + 1.2 + 0.25, -1.5);
+      tejadoAlaIzquierda.rotation.z = -0.05; // Caída de agua realista
+      tejadoAlaIzquierda.castShadow = true;
+      estacionVisual.add(tejadoAlaIzquierda);
+
+      const tejadoAlaDerecha = new THREE.Mesh(tejadoAlaGeo, matTejadoOriginal);
+      tejadoAlaDerecha.position.set(14, 6.5 + 1.2 + 0.25, -1.5);
+      tejadoAlaDerecha.rotation.z = 0.05;
+      tejadoAlaDerecha.castShadow = true;
+      estacionVisual.add(tejadoAlaDerecha);
+
+      // D. GRAN MARQUESINA FRONTAL DE PASAJEROS
+      // Integra el color de monitorización del dashboard (azul o naranja) en el canto
+      const marquesinaGeo = new THREE.BoxGeometry(38, 0.4, 4.5);
+      const matMarquesina = new THREE.MeshStandardMaterial({
+        color: colorFuncional, // Identificador de estado intacto
+        roughness: 0.3,
+        metalness: 0.5,
+      });
+      const marquesina = new THREE.Mesh(marquesinaGeo, matMarquesina);
+      marquesina.position.set(0, 5.5, 2.5); // Volada cubriendo la zona de espera junto a la vía
+      marquesina.castShadow = true;
+      estacionVisual.add(marquesina);
+
+      // Columnas finas de soporte metálico para la marquesina frontal
+      const soporteGeo = new THREE.CylinderGeometry(0.12, 0.12, 5.5, 4);
+      const matSoporte = new THREE.MeshStandardMaterial({
+        color: 0x1e293b,
+        metalness: 0.8,
+      });
+
+      const offsetsX = [-16, -7, 7, 16];
+      offsetsX.forEach((ox) => {
+        const pilar = new THREE.Mesh(soporteGeo, matSoporte);
+        pilar.position.set(ox, 2.75 + 1.2, 4.2);
+        pilar.castShadow = true;
+        estacionVisual.add(pilar);
+      });
+
+      // Asentamos todo el complejo sobre las coordenadas escaladas y el relieve real
+      estacionVisual.position.set(posX, alturaTerrenoY, posZ);
+
+      // Orientación automática: Orientamos el frontal del edificio mirando al eje de vías de forma armónica
+      estacionVisual.rotation.y = Math.atan2(posX, posZ) * 0.1;
+
+      scene.add(estacionVisual);
+
+      // Mapeamos los datos para el Raycaster original usando la marquesina de color como objetivo de hover
+      mapaDatosObjeto.set(estacionVisual.id, {
+        nombre: nodo.nombre,
+        slug: nodo.slug,
+        tipo: nodo.tieneSub ? "Subestación S/E" : "Estación Ferroviaria",
+        colorOriginal: colorFuncional,
+        esGrupoComplejo: true,
+        componenteColor: marquesina, // Mapeado al techo de la plataforma para los brillos reactivos
+      });
+
+      objetosInteractivos.push(estacionVisual);
+    });
+
+    // 3. GEOMETRÍA DE ALTA RESOLUCIÓN DEL TERRENO NATURAL
     const tamañoTerreno = 1000;
     const segmentos = 256;
-    const terrainGeo = new THREE.PlaneGeometry(tamañoTerreno, tamañoTerreno, segmentos, segmentos);
+    const terrainGeo = new THREE.PlaneGeometry(
+      tamañoTerreno,
+      tamañoTerreno,
+      segmentos,
+      segmentos,
+    );
 
     const posAttr = terrainGeo.attributes.position;
     const verticesCount = posAttr.count;
@@ -507,7 +645,11 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
         distanciaMinimaAVia = 999;
       }
 
-      const factorElevacion = THREE.MathUtils.smoothstep(distanciaMinimaAVia, 20, 90);
+      const factorElevacion = THREE.MathUtils.smoothstep(
+        distanciaMinimaAVia,
+        20,
+        90,
+      );
 
       let z = Math.sin(mundoX * 0.01) * Math.cos(mundoZ * 0.01) * 35;
       z += Math.sin(mundoX * 0.03) * Math.sin(mundoZ * 0.02) * 12;
@@ -519,39 +661,21 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
     terrainGeo.computeVertexNormals();
     posAttr.needsUpdate = true;
 
-    // 4. TEXTURA DIFUMINADA DINÁMICA
-    const canvasTextura = document.createElement("canvas");
-    canvasTextura.width = 1024;
-    canvasTextura.height = 1024;
-    const ctx = canvasTextura.getContext("2d");
+    // 4. TEXTURA FOTORREALISTA DE TERRENO NATURAL DEFINIDO
+    const textureLoader = new THREE.TextureLoader();
+    const texturaTerreno = textureLoader.load(
+      "https://threejs.org/examples/textures/terrain/grasslight-big.jpg",
+    );
 
-    if (ctx) {
-      ctx.fillStyle = "#6e5643";
-      ctx.fillRect(0, 0, 1024, 1024);
-
-      for (let i = 0; i < 40; i++) {
-        const posX = Math.random() * 1024;
-        const posY = Math.random() * 1024;
-        const radioBosque = 100 + Math.random() * 150;
-
-        const gradiente = ctx.createRadialGradient(posX, posY, 10, posX, posY, radioBosque);
-        gradiente.addColorStop(0, "rgba(46, 94, 52, 0.85)");
-        gradiente.addColorStop(0.5, "rgba(67, 115, 74, 0.5)");
-        gradiente.addColorStop(1, "rgba(110, 86, 67, 0)");
-
-        ctx.fillStyle = gradiente;
-        ctx.beginPath();
-        ctx.arc(posX, posY, radioBosque, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    const texturaTerreno = new THREE.CanvasTexture(canvasTextura);
+    texturaTerreno.wrapS = THREE.RepeatWrapping;
+    texturaTerreno.wrapT = THREE.RepeatWrapping;
+    texturaTerreno.repeat.set(8, 8);
+    texturaTerreno.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
     const terrainMat = new THREE.MeshStandardMaterial({
       map: texturaTerreno,
       roughness: 0.9,
-      metalness: 0.1,
+      metalness: 0.05,
       flatShading: false,
     });
 
@@ -560,7 +684,125 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
     terrain.receiveShadow = true;
     scene.add(terrain);
 
-    // INTERACTIVIDAD (RAYCASTER)
+    // 5. GENERACIÓN DE ÁRBOLES FOTORREALISTAS ASIMÉTRICOS
+    const numArboles = 150;
+    const copaGeo = new THREE.DodecahedronGeometry(5, 1);
+
+    const posicionVertices = copaGeo.attributes.position;
+    for (let i = 0; i < posicionVertices.count; i++) {
+      let vx = posicionVertices.getX(i);
+      let vy = posicionVertices.getY(i);
+      let vz = posicionVertices.getZ(i);
+
+      vx += (Math.random() - 0.5) * 1.6;
+      vy += (Math.random() - 0.5) * 1.6;
+      vz += (Math.random() - 0.5) * 1.6;
+
+      posicionVertices.setXYZ(i, vx, vy, vz);
+    }
+
+    posicionVertices.needsUpdate = true;
+    copaGeo.computeVertexNormals();
+
+    const textureLoaderArbol = new THREE.TextureLoader();
+    const texturaHojas = textureLoaderArbol.load(
+      "https://threejs.org/examples/textures/terrain/grasslight-big.jpg",
+    );
+    texturaHojas.wrapS = THREE.RepeatWrapping;
+    texturaHojas.wrapT = THREE.RepeatWrapping;
+    texturaHojas.repeat.set(4, 4);
+
+    const arbolMat = new THREE.MeshStandardMaterial({
+      map: texturaHojas,
+      color: 0x14321a,
+      roughness: 0.95,
+      metalness: 0.0,
+      flatShading: true,
+    });
+
+    const meshArboles = new THREE.InstancedMesh(copaGeo, arbolMat, numArboles);
+    meshArboles.castShadow = true;
+    meshArboles.receiveShadow = true;
+
+    const dummy = new THREE.Object3D();
+    let arbolesColocados = 0;
+    let intentos = 0;
+
+    while (arbolesColocados < numArboles && intentos < 1000) {
+      intentos++;
+      const randX = (Math.random() - 0.5) * tamañoTerreno;
+      const randZ = (Math.random() - 0.5) * tamañoTerreno;
+
+      let cercaDeVia = false;
+      if (todosLosPuntosDeVias.length > 0) {
+        // Analizamos los puntos de la vía para asegurar que ningún árbol invada el trazado
+        for (let j = 0; j < todosLosPuntosDeVias.length; j += 6) {
+          // Paso un poco más largo para mantener rendimiento
+          const puntoVia = todosLosPuntosDeVias[j];
+          const dx = randX - puntoVia.x;
+          const dz = randZ - puntoVia.z;
+
+          // Subimos el umbral de 500 a 3000 para ensanchar el pasillo libre de vegetación
+          if (dx * dx + dz * dz < 3000) {
+            cercaDeVia = true;
+            break;
+          }
+        }
+      }
+
+      if (!cercaDeVia) {
+        let distanciaMinimaAVia = Infinity;
+        // ... (El resto del cálculo de la alturaY y el factorElevacion se queda exactamente igual)
+        if (todosLosPuntosDeVias.length > 0) {
+          for (let j = 0; j < todosLosPuntosDeVias.length; j += 4) {
+            const puntoVia = todosLosPuntosDeVias[j];
+            const dx = randX - puntoVia.x;
+            const dz = randZ - puntoVia.z;
+            const distSq = dx * dx + dz * dz;
+            if (distSq < distanciaMinimaAVia) {
+              distanciaMinimaAVia = distSq;
+            }
+          }
+          distanciaMinimaAVia = Math.sqrt(distanciaMinimaAVia);
+        } else {
+          distanciaMinimaAVia = 999;
+        }
+
+        const factorElevacion = THREE.MathUtils.smoothstep(
+          distanciaMinimaAVia,
+          20,
+          90,
+        );
+
+        let alturaY = Math.sin(randX * 0.01) * Math.cos(randZ * 0.01) * 35;
+        alturaY += Math.sin(randX * 0.03) * Math.sin(randZ * 0.02) * 12;
+        alturaY += Math.cos(randX * 0.08) * Math.sin(randZ * 0.08) * 3;
+        alturaY *= factorElevacion;
+
+        dummy.position.set(randX, alturaY + 3, randZ);
+
+        const escalaAleatoria = 0.6 + Math.random() * 0.8;
+        dummy.scale.set(
+          escalaAleatoria,
+          escalaAleatoria * 1.2,
+          escalaAleatoria,
+        );
+
+        dummy.rotation.set(
+          Math.random() * Math.PI,
+          Math.random() * Math.PI,
+          Math.random() * Math.PI,
+        );
+
+        dummy.updateMatrix();
+        meshArboles.setMatrixAt(arbolesColocados, dummy.matrix);
+        arbolesColocados++;
+      }
+    }
+
+    scene.add(meshArboles);
+
+    // INTERACTIVIDAD AVANZADA (RAYCASTER POR JERARQUÍAS GRUPALES)
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
     let objetoInterseccionadoAnterior: any = null;
@@ -580,11 +822,18 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
-      const intersections = raycaster.intersectObjects(objetosInteractivos);
+      const intersections = raycaster.intersectObjects(
+        objetosInteractivos,
+        true,
+      );
 
       if (intersections.length > 0) {
-        const meshTarget = intersections[0].object;
-        const datos = mapaDatosObjeto.get(meshTarget.id);
+        let rootGroup = intersections[0].object;
+        while (rootGroup.parent && rootGroup.parent !== scene) {
+          rootGroup = rootGroup.parent;
+        }
+
+        const datos = mapaDatosObjeto.get(rootGroup.id);
         if (datos && datos.slug) {
           window.location.href = `/${lineaCod}/${datos.slug}`;
         }
@@ -599,37 +848,56 @@ const tramosPara3D = tramosDeEstaLinea.map((tramo) => {
       controls.update();
 
       raycaster.setFromCamera(mouse, camera);
-      const intersections = raycaster.intersectObjects(objetosInteractivos);
+      const intersections = raycaster.intersectObjects(
+        objetosInteractivos,
+        true,
+      );
 
       if (intersections.length > 0) {
-        const objetoActual = intersections[0].object as THREE.Mesh;
+        let objetoActual = intersections[0].object;
+        while (objetoActual.parent && objetoActual.parent !== scene) {
+          objetoActual = objetoActual.parent;
+        }
 
         if (objetoInterseccionadoAnterior !== objetoActual) {
           if (objetoInterseccionadoAnterior) {
-            const datosPrevios = mapaDatosObjeto.get(objetoInterseccionadoAnterior.id);
-            (objetoInterseccionadoAnterior.material as THREE.MeshStandardMaterial).color.setHex(datosPrevios.colorOriginal);
-            (objetoInterseccionadoAnterior.material as THREE.MeshStandardMaterial).emissive.setHex(0x000000);
+            const datosPrevios = mapaDatosObjeto.get(
+              objetoInterseccionadoAnterior.id,
+            );
+            if (datosPrevios && datosPrevios.esGrupoComplejo) {
+              datosPrevios.componenteColor.material.color.setHex(
+                datosPrevios.colorOriginal,
+              );
+              datosPrevios.componenteColor.material.emissive.setHex(0x000000);
+            }
           }
 
           objetoInterseccionadoAnterior = objetoActual;
-
-          const mat = objetoActual.material as THREE.MeshStandardMaterial;
-          mat.emissive.setHex(0x334155);
-          container!.style.cursor = "pointer";
-
           const datos = mapaDatosObjeto.get(objetoActual.id);
-          tooltip!.innerHTML = `
-            <div class="text-white font-bold">${datos.nombre}</div>
-            <div class="text-slate-400 text-[10px] mt-0.5 uppercase tracking-wider font-mono">${datos.tipo}</div>
-            <div class="text-emerald-400 text-[10px] mt-1 font-medium">➔ Clic para abrir planos</div>
-          `;
-          tooltip!.style.display = "block";
+
+          if (datos && datos.esGrupoComplejo) {
+            datos.componenteColor.material.emissive.setHex(0x223344);
+            container!.style.cursor = "pointer";
+
+            tooltip!.innerHTML = `
+              <div class="text-white font-bold">${datos.nombre}</div>
+              <div class="text-slate-400 text-[10px] mt-0.5 uppercase tracking-wider font-mono">${datos.tipo}</div>
+              <div class="text-emerald-400 text-[10px] mt-1 font-medium">➔ Clic para abrir planos</div>
+            `;
+            tooltip!.style.display = "block";
+          }
         }
       } else {
         if (objetoInterseccionadoAnterior) {
-          const datosPrevios = mapaDatosObjeto.get(objetoInterseccionadoAnterior.id);
-          (objetoInterseccionadoAnterior.material as THREE.MeshStandardMaterial).color.setHex(datosPrevios.colorOriginal);
-          (objetoInterseccionadoAnterior.material as THREE.MeshStandardMaterial).emissive.setHex(0x000000);
+          const datosPrevios = mapaDatosObjeto.get(
+            objetoInterseccionadoAnterior.id,
+          );
+          if (datosPrevios && datosPrevios.esGrupoComplejo) {
+            datosPrevios.componenteColor.material.color.setHex(
+              datosPrevios.colorOriginal,
+            );
+            datosPrevios.componenteColor.material.emissive.setHex(0x000000);
+          }
           objetoInterseccionadoAnterior = null;
           container!.style.cursor = "grab";
           tooltip!.style.display = "none";
