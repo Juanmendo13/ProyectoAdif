@@ -1,0 +1,41 @@
+---
+// src/pages/[linea]/[estacion]-3d.astro
+import { CONFIG_MAPAS, TRAMOS_VIAS } from "../../data/geo-infraestructura.js";
+
+export function getStaticPaths() {
+  const lineas = ["pe-17", "pe-24", "pe-26"];
+  const paths = [];
+
+  lineas.forEach((linea) => {
+    const tramosDeEstaLinea = TRAMOS_VIAS[linea] || [];
+    const estacionesUnicas = [...new Set(tramosDeEstaLinea.flat())];
+
+    estacionesUnicas.forEach((nombre) => {
+      // Generamos exactamente el mismo slug que usas en el mapa principal
+      const slugEstacion = nombre
+        .toLowerCase()
+        .replace(/\./g, "")
+        .replace(/[\s\-]+/g, "-")
+        .replace(/[^a-z0-9\-áéíóúñ]/g, "");
+
+      paths.push({
+        params: { 
+          linea: linea, 
+          estacion: slugEstacion 
+        },
+        props: {
+          nombreReal: nombre
+        }
+      });
+    });
+  });
+
+  return paths;
+}
+
+// Aquí recuperas los parámetros para usarlos en tu interfaz 3D de la estación
+const { linea, estacion } = Astro.params;
+const { nombreReal } = Astro.props;
+---
+
+<!-- El resto de tu HTML/Canvas/Script para la vista de la estación va aquí abajo -->
